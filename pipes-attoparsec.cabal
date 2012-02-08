@@ -1,0 +1,16 @@
+Name: pipes-attoparsec
+Version: 0.0.1
+License: BSD3
+License-file: LICENSE
+Author: Paolo Capriotti
+Maintainer: p.capriotti@gmail.com
+Category: Text
+Build-type: Simple
+Cabal-version: >=1.2
+
+Library
+  Exposed-modules: Control.Pipe.Attoparsec
+  Build-depends:
+    base (== 4.*),
+    pipes (== 1.1.*),
+    attoparsec (== 0.10.*)
