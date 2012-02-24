@@ -6,7 +6,7 @@ Author: Paolo Capriotti
 Maintainer: p.capriotti@gmail.com
 Category: Text
 Build-type: Simple
-Cabal-version: >=1.2
+Cabal-version: >=1.8
 
 Library
   Exposed-modules: Control.Pipe.Attoparsec
