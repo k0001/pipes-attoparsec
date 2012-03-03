@@ -4,8 +4,10 @@ module Control.Pipe.Attoparsec (
   pipeParser,
   ) where
 
-import Control.Exception
+import qualified Control.Exception as E
 import Control.Pipe
+import Control.Pipe.Combinators
+import Control.Pipe.Exception
 import Data.Attoparsec.Types
 import Data.Maybe
 import Data.Monoid
@@ -21,11 +23,11 @@ data ParseError
                                   -- when its input is exhausted.
     deriving (Show, Typeable)
 
-instance Exception ParseError
+instance E.Exception ParseError
 
 -- | Convert a parser continuation into a Pipe.
 --
--- To get a parser continuation from a 'Parser', use the parse function of the
+-- To get a parser continuation from a 'Parser', use the @parse@ function of the
 -- appropriate Attoparsec module.
 pipeParser :: (Monoid a, Monad m) => (a -> IResult a r) -> Pipe a x m (a, Either ParseError r)
 pipeParser p = go p
