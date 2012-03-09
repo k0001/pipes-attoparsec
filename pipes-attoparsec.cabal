@@ -4,9 +4,17 @@ License: BSD3
 License-file: LICENSE
 Author: Paolo Capriotti
 Maintainer: p.capriotti@gmail.com
+Stability: Experimental
+Homepage: https://github.com/pcapriotti/pipes-extra
 Category: Text
 Build-type: Simple
+Synopsis: Utilities to convert a parser into a pipe.
+Description: Utilities to convert a parser into a pipe.
 Cabal-version: >=1.8
+
+Source-Repository head
+    Type: git
+    Location: https://github.com/pcapriotti/pipes-extra
 
 Library
   Exposed-modules: Control.Pipe.Attoparsec
