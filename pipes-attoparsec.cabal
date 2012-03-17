@@ -1,5 +1,5 @@
 Name: pipes-attoparsec
-Version: 0.0.1
+Version: 0.0.2
 License: BSD3
 License-file: LICENSE
 Author: Paolo Capriotti
@@ -20,5 +20,5 @@ Library
   Exposed-modules: Control.Pipe.Attoparsec
   Build-depends:
     base (== 4.*),
-    pipes-core (== 0.0.*),
+    pipes-core (== 0.1.*),
     attoparsec (== 0.10.*)
