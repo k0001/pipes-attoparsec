@@ -17,8 +17,10 @@ Source-Repository head
     Location: https://github.com/pcapriotti/pipes-extra
 
 Library
-  Exposed-modules: Control.Pipe.Attoparsec
+  Exposed-modules: Control.Proxy.Attoparsec
   Build-depends:
     base (== 4.*),
-    pipes-core (== 0.1.*),
-    attoparsec (== 0.10.*)
+    pipes (== 3.0.*),
+    attoparsec (== 0.10.*),
+    bytestring (== 0.9.*),
+    text (== 0.11.*)
