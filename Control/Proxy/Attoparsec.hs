@@ -5,18 +5,22 @@ module Control.Proxy.Attoparsec
   ( -- * Usage example
     -- $example-simple
 
-    -- ** Handling errors.
+    -- ** Handling parsing errors
     -- $example-errors
+
+    -- ** Composing control
+    -- $example-compose-control
 
     -- * Parsing Proxy
     parserD
   , parsingPipe
   , defaultParsingPipe
-    -- ** Some useful controllers
+    -- ** Proxy Control
   , skipMalformedChunks
   , skipMalformedInput
   , throwParsingErrors
   , limitInputLength
+  , noControlU
   , module Control.Proxy.Attoparsec.Types
   ) where
 
@@ -31,9 +35,10 @@ import           Prelude                    hiding (drop, length, null)
 
 -- $example-simple
 --
--- We'll write a simple 'Parser' that turns 'Text' like /“Hello John Doe.”/
--- into some @'Name' \"John Doe\"@, and then make a 'Pipe' that turns those
--- 'Text' values flowing downstream into 'Name' values flowing downstream.
+-- We'll write a simple 'Parser' that turns 'Text' like /“Hello John
+-- Doe.”/ into @'Name' \"John Doe\"@, and then make a 'Pipe' that turns
+-- those 'Text' values flowing downstream into 'Name' values flowing
+-- downstream.
 --
 -- In this example we are using 'Text', but we may as well use 'ByteString'.
 -- Also, the 'OverloadedStrings' language extension lets us write our parser
@@ -51,7 +56,7 @@ import           Prelude                    hiding (drop, length, null)
 -- >           deriving (Show)
 -- >
 -- > hello :: Parser Name
--- > hello = fmap Name $ "Hello" .*> skipSpace >> takeWhile1 (/='.') <*. "."
+-- > hello = fmap Name $ "Hello " .*> char ' ' >> skipSpace >> takeWhile1 (/='.') <*. "."
 --
 -- We are done with our parser, now lets make a simple 'Pipe' out of it.
 --
@@ -89,9 +94,10 @@ import           Prelude                    hiding (drop, length, null)
 --
 -- > input2 :: [Text]
 -- > input2 =
--- >   [ "Hello Alice."
+-- >   [ "Hello Amy."
+-- >   , "Hello, Hello Tim."
 -- >   , "Hello Bob."
--- >   , "Hello"
+-- >   , "Hello James"
 -- >   , "Hello"
 -- >   , "Hello World."
 -- >   , "HexHello Jon."
@@ -102,21 +108,44 @@ import           Prelude                    hiding (drop, length, null)
 -- >   ]
 --
 -- >>> runProxy . runEitherK $ fromListS input2 >-> helloPipe1 >-> printD
--- Name "Alice"
--- Name "Bob"
--- Name "HelloHello World"
+-- Name "Amy"
 -- Left (MalformedInput {miParserErrror = ParserError {errorContexts = [], errorMessage = "Failed reading: takeWith"}})
 --
--- The simple @helloPipe1@ 'ParsingProxy' we built, when a parsing error is
--- arises, aborts its execution by throwing a 'BadInput' value in the 'EitherP'
--- proxy transformer. That might be enough if you are certain your input is
--- always well-formed, but sometimes you may prefer to just ignore the
--- particular input that caused the parser to fail and continue parsing new
--- input.
+-- The simple @helloPipe1@ we built aborts its execution by throwing a
+-- 'BadInput' value in the 'EitherP' proxy transformer when a parsing
+-- error is arises. That might be enough if you are certain your input
+-- is always well-formed, but sometimes you may prefer to just ignore
+-- the particular input that caused the parser to fail and continue
+-- parsing new input.
 --
--- Handlers for two common scenarios are provided, you use them to build your
--- parsing pipe using 'parsingPipe', instead of the previously used
--- 'defaultParsingPipe'.
+-- Instead of simply using 'defaultParsingPipe' to build @helloPipe1@,
+-- we could have used 'parsingPipe' and provide an additional error
+-- handler that would, for example, skip malformed /chunks/.
+--
+-- > parsingPipe :: (Monad m, Proxy p, AttoparsecInput a)
+-- >             => (ParsingStatus a -> ParsingControl p a m r)
+-- >             -> (() -> ParsingProxy p a b m r)
+-- >             -> () -> Pipe p a b m r
+--
+-- This is how 'defaultParsingPipe' made use of 'parsingPipe' for us:
+--
+-- > defaultParsingPipe parser = parsingPipe throwParsingErrors $ parserD parser
+--
+-- The function 'parserD' takes a @'Parser' a b@ and turns it into the
+-- 'ParsingProxy' which does the actual parsing. This proxy gets input
+-- from upstream after reporting its current status, which among other
+-- things, says whether the 'Parser' has failed processing the last
+-- input it was provided. The upstream 'Proxy', which we call
+-- 'ProxyControl', is then free to act upon this reported status. The
+-- 'parsingPipe' function takes a 'ProxyControl' and a 'ParsingProxy',
+-- and compose them together into a simple 'Pipe' receiving @a@ values
+-- from upstream and sending @b@ value downstream.
+--
+-- In 'defaultParsingPipe' we use 'throwParsingErrors' as our
+-- 'ProxyControl', which turns parsing failures into 'EitherP' errors.
+-- Some other handlers for common scenarios are provided, you can use
+-- them to build your parsing pipe using 'parsingPipe', or roll your own
+-- as you'll learn in "Custom ProxyControl#custom-proxy-control".
 --
 -- ['skipMalformedChunks']
 --   Skips the malformed /chunk/ being parsed and requests a new chunk to be
@@ -126,9 +155,9 @@ import           Prelude                    hiding (drop, length, null)
 --   > helloPipe2 = parsingPipe skipMalformedChunks $ parserD hello
 --
 --   >>> runProxy $ fromListS input2 >-> helloPipe2 >-> printD
---   Name "Alice"
+--   Name "Amy"
 --   Name "Bob"
---   Name "HelloHello World"
+--   Name "JamesHelloHello World"
 --   Name "Ann"
 --   Name "Jean-Luc"
 --
@@ -140,15 +169,49 @@ import           Prelude                    hiding (drop, length, null)
 --   > helloPipe3 = parsingPipe skipMalformedInput $ parserD hello
 --
 --   >>> runProxy $ fromListS input2 >-> helloPipe3 >-> printD
---   Name "Alice"
+--   Name "Amy"
+--   Name "Tim"
 --   Name "Bob"
---   Name "HelloHello World"
+--   Name "JamesHelloHello World"
 --   Name "Jon"
 --   Name "Ann"
 --   Name "Jean-Luc"
 --
+-- [@'limitInputLength' n@]
+--   If a @'Parser' a b@ has consumed input @a@ of length longer than
+--   @n@ without producing a @b@ value and it's still requesting more
+--   input,  then consider that an error and throw 'InputTooLong' in the
+--   'EitherP' proxy transformer.
 --
--- Notice from those examples how we do not get Left
+--   > helloPipe4 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
+--   > helloPipe4 = parsingPipe (limitInputLength 10) $ parserD hello
+--
+--   >>> runProxy . runEitherK $ fromListS input2 >-> helloPipe4 >-> printD
+--   Name "Amy"
+--   Name "Bob"
+--   Left (InputTooLong {itlLenght = 11})
+--
+--   Notice that by default parsing errors are ignored, that's why we
+--   didn't get any complaint about the malformed input between /“Amy”/
+--   and /“Bob”/.
+
+
+-- $example-compose-control
+--
+-- These handlers are just 'Proxy' values, so they can be easily
+-- composed together with @('>->')@. Say for example you want to limit the
+-- length of your input to 10 and you also want to skip malformed bits
+-- of input.
+--
+-- > helloPipe5 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
+-- > helloPipe5 = parsingPipe (limitInputLength 10 >-> skipMalformedInput) $ parserD hello
+--
+-- >>> runProxy . runEitherK $ fromListS input2 >-> helloPipe5 >-> printD
+-- Name "Amy"
+-- Name "Tim"
+-- Name "Bob"
+-- Left (InputTooLong {itlLenght = 11})
+
 
 -- | 'ParsingProxy' using the given @'Parser' a b@ to parse @a@ values flowing
 -- downstream into @b@ values.
@@ -181,7 +244,6 @@ parserD parser () = runIdentityP . forever $ start Idle
     -- | Length of the input consumed so far.
     pstLength (Parsing n) = n
     pstLength _           = 0
-
 
 
 
@@ -224,7 +286,8 @@ throwParsingErrors = foreverK $ go
 
 
 -- | If a downstream 'ParsingProxy' doesn't produce a value after having
--- consumed input least lenght @n@, then throw an 'InputTooLong' error.
+-- consumed input of at least lenght @n@, then throw an 'InputTooLong'
+-- error in the 'EitherP' proxy transformer.
 limitInputLength :: (Monad m, Proxy p, AttoparsecInput a)
                  => Int -> ParsingStatus a
                  -> ParsingControl (PE.EitherP BadInput p) a m r
@@ -232,17 +295,18 @@ limitInputLength n = foreverK $ go
   where go (Parsing m) | m >= n = PE.throw $ InputTooLong m
         go x                    = request x >>= respond
 
--- | Pipe parsing @a@ values flowing downstream into @b@ values through the
--- given 'ParsingProxy', controled by the given 'ParsingControl'.
+-- | Pipe parsing @a@ values flowing downstream into @b@ values through
+-- the given 'ParsingProxy', controled by the given 'ParsingControl'.
 --
 -- The default control behaviour is to ignore any 'ParsingStatus' and
 -- always 'Resume' parsing.
+--
+-- > parsingPipe control parsingp = noControlU >-> control >-> parsingp
 parsingPipe :: (Monad m, Proxy p, AttoparsecInput a)
             => (ParsingStatus a -> ParsingControl p a m r)
             -> (() -> ParsingProxy p a b m r)
             -> () -> Pipe p a b m r
-parsingPipe control parsingp = incoming >-> control >-> parsingp
-  where incoming _ = runIdentityP . forever $ request () >>= respond . Resume
+parsingPipe control parsingp = noControlU >-> control >-> parsingp
 
 
 -- | Pipe parsing @a@ values flowing downstream into @b@ values using the given
@@ -253,3 +317,11 @@ defaultParsingPipe :: (Monad m, Proxy p, AttoparsecInput a)
                    => Parser a b -> () -> Pipe (PE.EitherP BadInput p) a b m r
 defaultParsingPipe = parsingPipe throwParsingErrors . parserD
 
+
+
+-- | Proxy ignoring any 'ParsingStatus' flowing upstream, and turning
+-- @a@ values flowing downstream into @'Resume' a@ values.
+noControlU :: (Monad m, Proxy p)
+           => ParsingStatus a
+           -> p () a (ParsingStatus a) (ParsingSupply a) m r
+noControlU _ = runIdentityP . forever $ request () >>= respond . Resume

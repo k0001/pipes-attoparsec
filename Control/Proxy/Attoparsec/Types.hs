@@ -36,22 +36,18 @@ class AttoparsecInput a where
     drop :: Int -> a -> a
     -- | @length a@ returns the number of elements in @a@.
     length :: a -> Int
-    -- | @empty@ returns the empty value for @a@.
-    empty :: a
 
 instance AttoparsecInput BS.ByteString where
     parse = ABS.parse
     null = BS.null
     drop = BS.drop
     length = BS.length
-    empty = BS.empty
 
 instance AttoparsecInput T.Text where
     parse = AT.parse
     null = T.null
     drop = T.drop
     length = T.length
-    empty = T.empty
 
 
 
