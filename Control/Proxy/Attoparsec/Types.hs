@@ -1,5 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable
-           , KindSignatures     #-}
+{-# LANGUAGE DeriveDataTypeable, KindSignatures #-}
 
 module Control.Proxy.Attoparsec.Types
   ( -- * Attoparsec
@@ -9,7 +8,7 @@ module Control.Proxy.Attoparsec.Types
     -- * Proxy types
   , ParsingProxy
   , ParsingControl
-    -- ** Inter-proxy communication
+    -- * Proxy control
   , ParsingStatus(..)
   , ParsingSupply(..)
   , supplyChunk
