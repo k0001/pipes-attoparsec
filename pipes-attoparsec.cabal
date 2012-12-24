@@ -18,7 +18,7 @@ Source-Repository head
 
 Library
   Exposed-modules: Control.Proxy.Attoparsec
-                   Control.Proxy.Attoparsec.Tutorial
+                   Control.Proxy.Attoparsec.Control
                    Control.Proxy.Attoparsec.Types
   Build-depends:
     base (== 4.*),
