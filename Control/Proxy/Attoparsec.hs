@@ -74,13 +74,15 @@ parserD :: (Proxy p, Monad m, AttoparsecInput a)
         -> () -> p (ParserStatus a) (ParserSupply a) () b m r
 parserD parser () = runIdentityP . forever $ start Idle
   where
-    start = req (parse parser)
-    req k status = request status >>= \x -> case x of
-        Start chunk  -> enough chunk >>= processNew
-        Resume chunk -> enough chunk >>= process (parsedLength status) k
-      where enough chunk | null chunk = req k status
-                         | otherwise  = return chunk
-    processNew = process 0 (parse parser)
+    start = req $ parse parser
+    req k status = request' status >>= \ps -> case ps of
+      Start  chunk -> processNew chunk
+      Resume chunk -> process (parsedLength status) k chunk
+    request' status = do
+      ps <- request status
+      if null (supplyChunk ps) then request' status
+                               else return ps
+    processNew = process 0 $ parse parser
     process plen k chunk = case k chunk of
         Partial k'        -> req k' $ Parsing (plen + length chunk)
         Fail rest ctx msg -> start $ Failed rest (ParserError ctx msg)
