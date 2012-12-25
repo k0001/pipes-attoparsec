@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, KindSignatures #-}
+{-# LANGUAGE KindSignatures, DeriveFunctor #-}
 
 -- | This module exports common types used throughout
 -- @"Control.Proxy.Attoparsec".*@
@@ -21,7 +21,6 @@ import qualified Data.Attoparsec.Text       as AT
 import           Data.Attoparsec.Types
 import qualified Data.ByteString            as BS
 import qualified Data.Text                  as T
-import           Data.Typeable
 
 
 
@@ -47,13 +46,13 @@ data ParserStatus a
     { psLeftover :: a -- ^Input not yet consumed when the failure occurred.
     , psError    :: ParserError -- ^Error found while parsing.
     }
-  deriving (Show)
+  deriving (Show, Eq)
 
 
 data ParserError = ParserError
     { errorContexts :: [String]  -- ^ Contexts where the error occurred.
     , errorMessage  :: String    -- ^ Error message.
-    } deriving (Show, Typeable)
+    } deriving (Show, Eq)
 
 
 -- | Input chunk supplied to the 'ParsingProxy'.
@@ -63,7 +62,7 @@ data ParserSupply a
   | Resume a
   -- ^ Feed @a@ to the current parsing activity, as explained by
   -- 'ParserStatus'.
-  deriving (Show)
+  deriving (Show, Eq, Functor)
 
 
 -- | Get the input chunk from any 'ParserSupply' value.
@@ -80,7 +79,7 @@ data BadInput
   | MalformedInput
     { miParserErrror :: ParserError -- ^ Error found while parsing.
     }
-  deriving (Show)
+  deriving (Show, Eq)
 
 
 -- | A class for valid Attoparsec input types.
