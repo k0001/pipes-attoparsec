@@ -35,18 +35,22 @@ You may import this module and try the subsequent examples as you go.
 > import Control.Proxy.Attoparsec
 > import Control.Proxy.Trans.Either
 > import Data.Attoparsec.Text
+> import Data.ByteString (ByteString)
 > import Data.Text
 >
 > data Name = Name Text
 >           deriving (Show)
 >
 > hello :: Parser Name
-> hello = fmap Name $ "Hello " .*> char ' ' >> skipSpace >> takeWhile1 (/='.') <*. "."
+> hello = fmap Name $ "Hello " .*> takeWhile1 (/='.') <*. "."
 >
 > input1 :: [Text]
 > input1 =
 >   [ "Hello Kate."
->   , "Hello Mary."
+>   , "Hello Mary.Hello Jef"
+>   , "f."
+>   , "Hel"
+>   , "lo Tom."
 >   ]
 >
 > input2 :: [Text]
@@ -64,20 +68,20 @@ You may import this module and try the subsequent examples as you go.
 >   , "Hello Jean-Luc."
 >   ]
 >
-> helloPipe1 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
-> helloPipe1 = defaultParsingPipe hello
+> helloPipe1 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
+> helloPipe1 = parserInputD >-> parserD hello
 >
 > helloPipe2 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
-> helloPipe2 = parsingPipe skipMalformedChunks $ parserD hello
+> helloPipe2 = parserInputD >-> skipMalformedInput >-> parserD hello
 >
-> helloPipe3 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
-> helloPipe3 = parsingPipe skipMalformedInput $ parserD hello
+> helloPipe3 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
+> helloPipe3 = parserInputD >-> throwParsingErrors >-> parserD hello
 >
 > helloPipe4 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
-> helloPipe4 = parsingPipe (limitInputLength 10) $ parserD hello
+> helloPipe4 = parserInputD >-> limitInputLength 10 >-> parserD hello
 >
 > helloPipe5 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
-> helloPipe5 = parsingPipe (limitInputLength 10 >-> skipMalformedInput) $ parserD hello
+> helloPipe5 = parserInputD >-> limitInputLength 10 >-> skipMalformedInput >-> parserD hello
 
 
 
@@ -86,7 +90,7 @@ $example-simple
 We'll write a simple 'Parser' that turns 'Text' like /“Hello John Doe.”/
 into @'Name' \"John Doe\"@, and then make a 'Pipe' that turns
 those 'Text' values flowing downstream into 'Name' values flowing
-downstream.
+downstream using that 'Parser'.
 
 In this example we are using 'Text', but we may as well use 'ByteString'.
 Also, the 'OverloadedStrings' language extension lets us write our parser
@@ -104,38 +108,55 @@ easily.
   >           deriving (Show)
   >
   > hello :: Parser Name
-  > hello = fmap Name $ "Hello " .*> char ' ' >> skipSpace >> takeWhile1 (/='.') <*. "."
+  > hello = fmap Name $ "Hello " .*> takeWhile1 (/='.') <*. "."
 
+We are done with our parser, now lets make a simple parsing 'Pipe' with it.
 
-We are done with our parser, now lets make a simple 'Pipe' out of it.
-
-  > helloPipe1 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
-  > helloPipe1 = defaultParsingPipe hello
-
+  > helloPipe1 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
+  > helloPipe1 = parserInputD >-> parserD hello
 
 As the type indicates, this 'Pipe' recieves 'Text' values from upstream and
-sends 'Name' values downstream. Through the 'EitherP' proxy transformer we
-report upstream errors due to bad input.
+sends 'Name' values downstream. This 'Pipe' is made of two smaller
+two smaller cooperating 'Proxy's:
 
-We need some sample input.
+  1. 'parserInputD': Prepares @a@ input received from upstream to be
+     consumed by a downstream parsing 'Proxy'.
+
+  2. 'parserD': Repeatedly runs a given @'Parser' a b@ on input 'a' from
+     upstream, and sends 'b' values downstream.
+
+We need some sample input to test our simple 'helloPipe1'.
 
   > input1 :: [Text]
   > input1 =
   >   [ "Hello Kate."
-  >   , "Hello Mary."
+  >   , "Hello Mary.Hello Jef"
+  >   , "f."
+  >   , "Hel"
+  >   , "lo Tom."
   >   ]
 
-Now we can try our parsing pipe. We'll use @'fromListS' input1@ as our
-input source, which sends downstream one element from the list at a time.
-We'll call each of these elements a /chunk/. So, @'fromListS' input1@ sends
-two /chunks/ of 'Text' downstream.
+We'll use @'fromListS' input1@ as our input source, which sends
+downstream one element from the list at a time. We'll call each of these
+elements a /chunk/. So, @'fromListS' input1@ sends 5 /chunks/ of
+'Text' downstream.
 
-  >>> runProxy . runEitherK $ fromListS input1 >-> helloPipe1 >-> printD
+Notice how some of our /chunks/ are not, by themselves, complete inputs
+for our 'hello' 'Parser'. This is fine; we want to be able to feed the
+'Parser' with either partial or complete input as soon as it's
+received from upstream. More input will be requested when needed.
+Attoparsec's 'Parser' handles partial parsing just fine.
+
+  >>> runProxy $ fromListS input1 >-> helloPipe1 >-> printD
+  runProxy $  fromListS input1 >-> helloPipe1 >-> printD
   Name "Kate"
   Name "Mary"
-  Right ()
+  Name "Jeff"
+  Name "Tom"
 
-We have acomplished our goal.
+
+We have acomplished our simple goal: We've made a 'Pipe' that parses
+downstream flowing input using our 'Parser' 'hello'.
 
 
 $example-errors
@@ -157,70 +178,38 @@ Let's try with some more complex input.
   >   , "Hello Jean-Luc."
   >   ]
 
-  >>> runProxy . runEitherK $ fromListS input2 >-> helloPipe1 >-> printD
-  Name "Amy"
-  Left (MalformedInput {miParserErrror = ParserError {errorContexts = [], errorMessage = "Failed reading: takeWith"}})
-
-The simple @helloPipe1@ we built aborts its execution by throwing a
-'MalformedInput' value in the 'EitherP' proxy transformer when a
-parsing error is arises. That might be enough if you are certain your
-input is always well-formed, but sometimes you may prefer to act
-differently on these extraordinary situations.
-
-Instead of simply using 'defaultParsingPipe' to build @helloPipe1@,
-we could use 'parsingPipe' and provide an additional error handler
-that would, for example, skip malformed /chunks/.
-
-  > parsingPipe :: (Monad m, Proxy p, AttoparsecInput a)
-  >             => (ParsingStatus a -> ParsingControl p a m r)
-  >             -> (() -> ParsingProxy p a b m r)
-  >             -> () -> Pipe p a b m r
-
-This is how 'defaultParsingPipe' made use of 'parsingPipe' for us:
-
-  > defaultParsingPipe parser = parsingPipe throwParsingErrors $ parserD parser
-
-The function 'parserD' takes a @'Parser' a b@ and turns it into the
-'ParsingProxy' which does the actual parsing. This proxy gets input
-from upstream after reporting its current status, which among other
-things, says whether the 'Parser' has failed processing the last
-input it was provided. The upstream 'Proxy', which we call
-'ProxyControl', is then free to act upon this reported status. The
-'parsingPipe' function takes a 'ProxyControl' and a 'ParsingProxy',
-and compose them together into a simple 'Pipe' receiving @a@ values
-from upstream and sending @b@ value downstream.
-
-In 'defaultParsingPipe' we use 'throwParsingErrors' as our
-'ProxyControl', which turns parsing failures into 'EitherP' errors.
-Some other handlers for common scenarios are provided, you can use
-them to build your parsing pipe using 'parsingPipe', or roll your own
-as you'll learn in "Custom ProxyControl#custom-proxy-control".
-
-You can learn more details about these handlers in
-"Control.Proxy.Attoparsec". Here we'll see some usage examples.
-
-['skipMalformedChunks']
-  Skips the malformed /chunk/ being parsed and requests a new chunk to be
-  parsed from start.
-
-  > helloPipe2 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
-  > helloPipe2 = parsingPipe skipMalformedChunks $ parserD hello
-
-  >>> runProxy $ fromListS input2 >-> helloPipe2 >-> printD
+  >>> runProxy $ fromListS input2 >-> helloPipe1 >-> printD
   Name "Amy"
   Name "Bob"
   Name "JamesHelloHello World"
   Name "Ann"
   Name "Jean-Luc"
 
+The simple @helloPipe1@ we built skips /chunks/ of input that fail to be
+parsed, and then continues parsing new input. That approach might be
+enough if you are certain your input is always well-formed, but
+sometimes you may prefer to act differently on these extraordinary
+situations.
+
+Instead of just using 'parserInputD' and 'parserD' to build our
+'helloPipe1', we could have used an additional 'Proxy' in beween them to
+handle these situations. The module "Control.Proxy.Attoparsec.Control"
+exports some useful 'Proxy's that serve this purpose. The default
+behavior just mentioned resembles the one provided by
+'skipMalformedChunks'.
+
+Here are some other examples:
+
 ['skipMalformedInput']
-  Skips single pieces of the malformed /chunk/, one at a time, until parsing
-  succeds. It requests a new /chunk/ if needed.
+  Skips single /pieces of the malformed chunk/, one at a time, until parsing
+  succeds. It requests a new input from upstream if needed. Compare this
+  behavior with that of 'skipMalformedChunks', which skips /the entire
+  malformed chunk/.
 
-  > helloPipe3 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
-  > helloPipe3 = parsingPipe skipMalformedInput $ parserD hello
+  > helloPipe2 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
+  > helloPipe2 = parserInputD >-> skipMalformedInput >-> parserD hello
 
-  >>> runProxy $ fromListS input2 >-> helloPipe3 >-> printD
+  >>> runProxy $ fromListS input2 >-> helloPipe2 >-> printD
   Name "Amy"
   Name "Tim"
   Name "Bob"
@@ -229,34 +218,46 @@ You can learn more details about these handlers in
   Name "Ann"
   Name "Jean-Luc"
 
+['throwParsingErrors']
+  When a parsing error arises, aborts execution by throwing
+  'MalformedInput' in the 'EitherP' proxy transformer.
+
+  > helloPipe3 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
+  > helloPipe3 = parserInputD >-> throwParsingErrors >-> parserD hello
+
+  >>> runProxy . runEitherK $ fromListS input2 >-> helloPipe3 >-> printD
+  Name "Amy"
+  Left (MalformedInput {miParserErrror = ParserError {errorContexts = [], errorMessage = "Failed reading: takeWith"}})
+
 [@'limitInputLength' n@]
   If a @'Parser' a b@ has consumed input @a@ of length longer than
-  @n@ without producing a @b@ value and it's still requesting more
-  input,  then consider that an error and throw 'InputTooLong' in the
-  'EitherP' proxy transformer.
+  @n@ without producing a @b@ value, and it's still requesting more
+  input, then throw 'InputTooLong' in the 'EitherP' proxy transformer.
 
   > helloPipe4 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
-  > helloPipe4 = parsingPipe (limitInputLength 10) $ parserD hello
+  > helloPipe4 = parserInputD >-> limitInputLength 10 >-> parserD hello
 
   >>> runProxy . runEitherK $ fromListS input2 >-> helloPipe4 >-> printD
   Name "Amy"
   Name "Bob"
   Left (InputTooLong {itlLenght = 11})
 
-  Notice that by default parsing errors are ignored, that's why we
-  didn't get any complaint about the malformed input between /“Amy”/
-  and /“Bob”/.
+  Notice that by default, as mentioned earlier, parsing errors are
+  ignored by skipping the malformed /chunk/. That's why we didn't get any
+  complaint about the malformed input between /“Amy”/ and /“Bob”/.
 
 
 $example-compose-control
 
-These handlers are just 'Proxy' values, so they can be easily
-composed together with @('>->')@. Suppose you want to limit the
-length of your input to 10 and you also want to skip malformed bits
-of input.
+These 'Proxy's that control the parsing behavior can be easily plugged
+together with @('>->')@ to achieve a combined functionality, Keep in
+mind that the order in which these 'Proxy's are used is important.
+
+Suppose you don't want to parse inputs of length longer than 10, and you
+also want to skip /small bits of malformed input/.
 
   > helloPipe5 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
-  > helloPipe5 = parsingPipe (limitInputLength 10 >-> skipMalformedInput) $ parserD hello
+  > helloPipe5 = parserInputD >-> limitInputLength 10 >-> skipMalformedInput >-> parserD hello
 
   >>> runProxy . runEitherK $ fromListS input2 >-> helloPipe5 >-> printD
   Name "Amy"

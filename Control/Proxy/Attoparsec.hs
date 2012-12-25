@@ -25,13 +25,13 @@ import Prelude                    hiding (length, null)
 -- $pieces
 --
 -- A 'Pipe' that parses @a@ input flowing downstream into @b@ values is
--- made of at least two smaller 'Proxy's:
+-- made of at least two smaller cooperating 'Proxy's:
 --
---  1. 'parserInputD': A 'Proxy' that prepares @a@ input received from
---     upstream to be consumed by a downstream parsing 'Proxy'.
+--  1. 'parserInputD': Prepares @a@ input received from upstream to be
+--     consumed by a downstream parsing 'Proxy'.
 --
---  2. 'parserD': A 'Proxy' that runs a given @'Parser' a b@ on
---     input 'a' from upstream, and sends 'b' values downstream.
+--  2. 'parserD': Repeatedly runs a given @'Parser' a b@ on input 'a'
+--     from upstream, and sends 'b' values downstream.
 --
 -- Given a @'Parser' a b@ named @myParser@, the simplest way to use
 -- these 'Proxy's together is:

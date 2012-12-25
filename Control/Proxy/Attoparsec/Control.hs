@@ -46,7 +46,7 @@ skipMalformedInput = runIdentityK . foreverK $ go
 
 
 -- | If a downstream parsing 'Proxy' reports a parser failure, then
--- throw a 'MalformedInput' error.
+-- throw a 'MalformedInput' error in the 'EitherP' proxy transformer.
 throwParsingErrors
   :: (Monad m, Proxy p, AttoparsecInput a)
   => ParserStatus a
@@ -57,7 +57,7 @@ throwParsingErrors = foreverK $ go
 
 
 -- | If a downstream parsing 'Proxy' doesn't produce a value after
--- having consumed input of at least lenght @n@, then throw an
+-- having consumed input of at least the given length, then throw an
 -- 'InputTooLong' error in the 'EitherP' proxy transformer.
 limitInputLength
   :: (Monad m, Proxy p, AttoparsecInput a)
