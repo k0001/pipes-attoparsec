@@ -39,11 +39,10 @@ You may import this module and try the subsequent examples as you go.
 > import Control.Proxy.Attoparsec
 > import Control.Proxy.Trans.Either
 > import Data.Attoparsec.Text
-> import Data.ByteString (ByteString)
 > import Data.Text
 >
 > data Name = Name Text
->           deriving (Show)
+>           deriving (Show, Eq)
 >
 > hello :: Parser Name
 > hello = fmap Name $ "Hello " .*> takeWhile1 (/='.') <*. "."
@@ -96,9 +95,9 @@ into @'Name' \"John Doe\"@, and then make a 'Pipe' that turns
 those 'Text' values flowing downstream into 'Name' values flowing
 downstream using that 'Parser'.
 
-In this example we are using 'Text', but we may as well use 'ByteString'.
-Also, the 'OverloadedStrings' language extension lets us write our parser
-easily.
+In this example we are using 'Text', but we may as well use
+'Data.ByteString.ByteString'. Also, the 'OverloadedStrings' language
+extension lets us write our parser easily.
 
   > {-# LANGUAGE OverloadedStrings #-}
   >

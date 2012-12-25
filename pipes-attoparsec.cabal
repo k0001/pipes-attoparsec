@@ -27,3 +27,22 @@ Library
     attoparsec (== 0.10.*),
     bytestring (== 0.9.*),
     text (== 0.11.*)
+  ghc-options:
+    -Wall -threaded -rtsopts -fno-warn-missing-signatures
+
+test-suite tests
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: tests
+  main-is:        Main.hs
+  ghc-options:
+    -Wall -threaded -rtsopts -fno-warn-missing-signatures
+
+  build-depends:
+    base (== 4.*),
+    pipes (== 3.0.*),
+    pipes-attoparsec,
+    QuickCheck (== 2.5.*),
+    HUnit (== 1.2.*),
+    test-framework (== 0.6.*),
+    test-framework-quickcheck2 (== 0.2.*),
+    test-framework-hunit (== 0.2.*)
