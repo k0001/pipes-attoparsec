@@ -12,11 +12,15 @@ You may import this module and try the subsequent examples as you go.
 >   (-- * Simple example
 >    -- $example-simple
 >
->    -- * Handling parsing errors
+>    -- * Parsing control proxies
+>    -- ** Handling parser errors
 >    -- $example-errors
 >
->    -- * Composing control
+>    -- ** Composing
 >    -- $example-compose-control
+>
+>    -- ** Roll your own
+>    -- $example-control-custom
 >
 >    -- * Try for yourself
 >    -- $example-try
@@ -266,7 +270,26 @@ also want to skip /small bits of malformed input/.
   Left (InputTooLong {itlLenght = 11})
 
 
+$example-control-custom
+
+In case the parsing control 'Proxy's provided by
+"Control.Proxy.Attoparsec.Control" are not enough for your needs, you
+can easily roll your own.
+
+A parsing control 'Proxy' receives a @'ParserStatus' a@ from downstream,
+which states the status of a downstream 'parserD' parsing 'Proxy'. The
+parsing control 'Proxy' may opt to discard or use the values found in
+this @'ParserStatus' a@ value, and must then send a new @'ParserStatus'
+a@ value upstream. In exchange, it will receive from upstream a
+@'ParserSupply' a@ value, which holds both the input to be parsed, and
+directives on wether the current parsing activity should be resumed
+using the given input, or if instead a new 'Parser' should be started
+and the input fed to it. See the documentation about 'ParserStatus' and
+'ParserSupply' for more details about this.
+
+
+
 $example-try
 
-This module exports the following aforementioned examples so
-that you can try them.
+This module exports the following previous examples so that you can try
+them.
