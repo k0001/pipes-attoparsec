@@ -33,6 +33,8 @@ You may import this module and try the subsequent examples as you go.
 >   , helloPipe3
 >   , helloPipe4
 >   , helloPipe5
+>   , helloPipe6
+>   , skipPartialResults
 >   ) where
 >
 > import Control.Proxy
@@ -85,7 +87,17 @@ You may import this module and try the subsequent examples as you go.
 >
 > helloPipe5 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
 > helloPipe5 = parserInputD >-> limitInputLength 10 >-> skipMalformedInput >-> parserD hello
-
+>
+> helloPipe6 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
+> helloPipe6 = parserInputD >-> skipPartialResults >-> parserD hello
+>
+> skipPartialResults
+>  :: (Monad m, Proxy p, AttoparsecInput a)
+>  => ParserStatus a
+>  -> p (ParserStatus a) (ParserSupply a) (ParserStatus a) (ParserSupply a) m r
+> skipPartialResults = runIdentityK . foreverK $ go
+>   where go x@(Parsing _) = request x >>= respond . Start . supplyChunk
+>         go x             = request x >>= respond
 
 
 $example-simple
@@ -150,8 +162,7 @@ for our 'hello' 'Parser'. This is fine; we want to be able to feed the
 received from upstream. More input will be requested when needed.
 Attoparsec's 'Parser' handles partial parsing just fine.
 
-  >>> runProxy $ fromListS input1 >-> helloPipe1 >-> printD
-  runProxy $  fromListS input1 >-> helloPipe1 >-> printD
+  >>> runProxy $  fromListS input1 >-> helloPipe1 >-> printD
   Name "Kate"
   Name "Mary"
   Name "Jeff"
@@ -275,20 +286,55 @@ In case the parsing control 'Proxy's provided by
 "Control.Proxy.Attoparsec.Control" are not enough for your needs, you
 can easily roll your own.
 
-A parsing control 'Proxy' receives a @'ParserStatus' a@ from downstream,
-which states the status of a downstream 'parserD' parsing 'Proxy'. The
-parsing control 'Proxy' may opt to discard or use the values found in
-this @'ParserStatus' a@ value, and must then send a new @'ParserStatus'
-a@ value upstream. In exchange, it will receive from upstream a
-@'ParserSupply' a@ value, which holds both the input to be parsed, and
-directives on wether the current parsing activity should be resumed
-using the given input, or if instead a new 'Parser' should be started
-and the input fed to it. See the documentation about 'ParserStatus' and
-'ParserSupply' for more details about this.
+A parsing control 'Proxy' receives a @'ParserStatus' a@ from downstream
+reporting the status of a 'parserD' parsing 'Proxy', and in exchange it should
+respond with a @'ParserSupply' a@ value, which holds both the input to be
+parsed and directives on whether the current parsing activity should be resumed
+using the given input, or if instead, a new 'Parser' should be started and the
+input fed to it. Any of these values might be changed on their way through this
+new 'Proxy'. See the documentation about 'ParserStatus' and 'ParserSupply' for
+more details.
 
+Suppose you want to write a parsing control 'Proxy' that never provides
+additional input to partial parsing results. Let's first take a look at the
+type of this 'Proxy':
+
+  > skipPartialResults
+  >  :: (Monad m, Proxy p, AttoparsecInput a)
+  >  => ParserStatus a
+  >  -> p (ParserStatus a) (ParserSupply a) (ParserStatus a) (ParserSupply a) m r
+
+Remember, a parsing control 'Proxy' just forwards @'ParserStatus' a@ values
+upstream and @'ParserSupply' a@ values downstream, optionaly replacing them by
+new values. In our case, if we receive @'Parsing' n@ from downstream, then we
+know there is a partial parsing result waiting for more input. If we were to
+respond to this request with a @'Resume' a@ value, then the partial parsing
+would continue, but if we change our response to @'Start' a@, then the partial
+parsing would be aborted and a new parsing activity would start consuming the
+given input. The code is straigthforward:
+
+  > skipPartialResults = runIdentityK . foreverK $ go
+  >   where go x@(Parsing _) = request x >>= respond . Start . supplyChunk
+  >         go x             = request x >>= respond
+
+We forward upstream the request we got from downstream, then we use
+'supplyChunk' to extract the input /chunk/ from a @'ParserSupply' a@ received
+from upstream, and finally we use 'Start' to construct our new desired
+@'ParserSupply' a@ value before responding.
+
+Now we can use this parsing control 'Proxy' with some simple input and see it
+working.
+
+  > helloPipe6 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
+  > helloPipe6 = parserInputD >-> skipPartialResults >-> parserD hello
+
+  >>> runProxy $ fromListS input1 >-> helloPipe6 >-> printD
+  Name "Kate"
+  Name "Mary"
 
 
 $example-try
 
 This module exports the following previous examples so that you can try
 them.
+

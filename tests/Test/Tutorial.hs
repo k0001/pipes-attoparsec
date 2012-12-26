@@ -49,6 +49,10 @@ test_helloPipe5_input2 = testPipe helloPipe5 input2 test
                [Name "Amy", Name "Tim", Name "Bob"]) = True
          test _                                      = False
 
+test_helloPipe6_input1 = testPipe helloPipe6 input1 test
+   where test (Right _, [Name "Kate", Name "Mary"]) = True
+         test _                                     = False
+
 
 tests =
     [ testCase "helloPipe1 + input1" test_helloPipe1_input1
@@ -57,5 +61,6 @@ tests =
     , testCase "helloPipe3 + input2" test_helloPipe3_input2
     , testCase "helloPipe4 + input2" test_helloPipe4_input2
     , testCase "helloPipe5 + input2" test_helloPipe5_input2
+    , testCase "helloPipe6 + input1" test_helloPipe6_input1
     ]
 
