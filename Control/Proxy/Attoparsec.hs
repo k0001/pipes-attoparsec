@@ -15,11 +15,11 @@ module Control.Proxy.Attoparsec
   , module Control.Proxy.Attoparsec.Control
   ) where
 
-import Control.Proxy
-import Control.Proxy.Attoparsec.Control
-import Control.Proxy.Attoparsec.Types
-import Data.Attoparsec.Types             (Parser(..), IResult(..))
-import Prelude                    hiding (length, null)
+import           Control.Proxy
+import           Control.Proxy.Attoparsec.Control
+import           Control.Proxy.Attoparsec.Types
+import           Data.Attoparsec.Types            (IResult (..), Parser)
+import           Prelude                          hiding (length, null)
 
 
 -- $pieces
@@ -95,7 +95,4 @@ parserD parser () = runIdentityP . forever $ start Idle
 parsedLength :: ParserStatus a -> Int
 parsedLength (Parsing n) = n
 parsedLength _           = 0
-
-
-
 

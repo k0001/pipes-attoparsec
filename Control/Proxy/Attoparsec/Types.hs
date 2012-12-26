@@ -1,4 +1,5 @@
-{-# LANGUAGE KindSignatures, DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor  #-}
+{-# LANGUAGE KindSignatures #-}
 
 -- | This module exports common types used throughout
 -- @"Control.Proxy.Attoparsec".*@
@@ -15,7 +16,6 @@ module Control.Proxy.Attoparsec.Types
   , ParserError(..)
   ) where
 
-import           Control.Proxy
 import qualified Data.Attoparsec.ByteString as ABS
 import qualified Data.Attoparsec.Text       as AT
 import           Data.Attoparsec.Types
