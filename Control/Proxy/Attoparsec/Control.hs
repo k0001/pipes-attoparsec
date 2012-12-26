@@ -51,7 +51,7 @@ throwParsingErrors
   :: (Monad m, Proxy p, AttoparsecInput a)
   => ParserStatus a
   -> PE.EitherP BadInput p (ParserStatus a) (ParserSupply a) (ParserStatus a) (ParserSupply a) m r
-throwParsingErrors = foreverK $ go
+throwParsingErrors = foreverK go
   where go (Failed _ e) = PE.throw $ MalformedInput e
         go x            = request x >>= respond
 
@@ -64,7 +64,7 @@ limitInputLength
   => Int
   -> ParserStatus a
   -> PE.EitherP BadInput p (ParserStatus a) (ParserSupply a) (ParserStatus a) (ParserSupply a) m r
-limitInputLength n = foreverK $ go
+limitInputLength n = foreverK go
   where go (Parsing m) | m >= n = PE.throw $ InputTooLong m
         go x                    = request x >>= respond
 
