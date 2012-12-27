@@ -1,9 +1,8 @@
 > {-# LANGUAGE OverloadedStrings #-}
 
-| In this tutorial you will learn how to use this library. The
-"Simple example#example-simple" section should be enough to get you
-going, but you can keep reading if you want to better understand how
-to deal with complex parsing scenarios.
+| In this tutorial you will learn how to use this library. The /Simple example/
+section should be enough to get you going, but you can keep reading if you want
+to better understand how to deal with complex parsing scenarios.
 
 You may import this module and try the subsequent examples as you go.
 
@@ -167,7 +166,6 @@ Attoparsec's 'Parser' handles partial parsing just fine.
   Name "Mary"
   Name "Jeff"
   Name "Tom"
-
 
 We have acomplished our simple goal: We've made a 'Pipe' that parses
 downstream flowing input using our 'Parser' 'hello'.
