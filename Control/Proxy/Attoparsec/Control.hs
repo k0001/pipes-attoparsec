@@ -3,7 +3,7 @@
 
 module Control.Proxy.Attoparsec.Control
   ( skipMalformedChunks
-  , skipMalformedInput
+  , retryLeftovers
   , throwParsingErrors
   , limitInputLength
   ) where
@@ -28,21 +28,31 @@ skipMalformedChunks = runIdentityK . foreverK $ go
         go x             = request x    >>= respond
 
 
--- | If a downstream parsing 'Proxy' reports a parsing failure, keep
--- skipping bits of left-over input until the parsing succeeds, and then
--- resume normal parsing operation. If there are no left-overs, then
--- more input is requested from upstream.
-skipMalformedInput
+-- | If a downstream parsing 'Proxy' reports a parsing failure, then
+-- keep retrying with any left-over input, skipping individual bits each
+-- time. If there are no left-overs, then more input is requestsd form
+-- upstream.
+retryLeftovers
   :: (Monad m, Proxy p, AttoparsecInput a)
   => ParserStatus a
   -> p (ParserStatus a) (ParserSupply a) (ParserStatus a) (ParserSupply a) m r
-skipMalformedInput = runIdentityK . foreverK $ go
-  where go (Failed rest _) = do
-          let rest' = drop 1 rest
-          if null rest'
-            then request Idle >>= respond . Resume . supplyChunk
-            else respond $ Resume rest'
-        go x = request x >>= respond
+retryLeftovers = runIdentityK . foreverK $ go
+  where
+    go s@(Failed _ _) = retry s >>= moreSupply >>= respond
+    go s              = request s >>= respond
+
+    retry s@(Failed rest _) = do
+      s' <- respond $ Resume rest
+      if s' == s then return s
+                 else retry s'
+    retry s = return s
+
+    moreSupply s@(Failed rest _) = do
+      let rest' = drop 1 rest
+      if null rest'
+        then request s
+        else return $ Start rest'
+    moreSupply s = request s
 
 
 -- | If a downstream parsing 'Proxy' reports a parser failure, then

@@ -83,7 +83,7 @@ data BadInput
 
 
 -- | A class for valid Attoparsec input types.
-class AttoparsecInput a where
+class Eq a => AttoparsecInput a where
     -- | Run a 'Parser' with input @a@.
     parse :: Parser a b -> a -> IResult a b
     -- | Tests whether @a@ is empty.

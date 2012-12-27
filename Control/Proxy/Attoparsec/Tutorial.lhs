@@ -76,7 +76,7 @@ You may import this module and try the subsequent examples as you go.
 > helloPipe1 = parserInputD >-> parserD hello
 >
 > helloPipe2 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
-> helloPipe2 = parserInputD >-> skipMalformedInput >-> parserD hello
+> helloPipe2 = parserInputD >-> retryLeftovers >-> parserD hello
 >
 > helloPipe3 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
 > helloPipe3 = parserInputD >-> throwParsingErrors >-> parserD hello
@@ -85,7 +85,7 @@ You may import this module and try the subsequent examples as you go.
 > helloPipe4 = parserInputD >-> limitInputLength 10 >-> parserD hello
 >
 > helloPipe5 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
-> helloPipe5 = parserInputD >-> limitInputLength 10 >-> skipMalformedInput >-> parserD hello
+> helloPipe5 = parserInputD >-> limitInputLength 10 >-> retryLeftovers >-> parserD hello
 >
 > helloPipe6 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
 > helloPipe6 = parserInputD >-> skipPartialResults >-> parserD hello
@@ -212,14 +212,13 @@ behavior just mentioned resembles the one provided by
 
 Here are some other examples:
 
-['skipMalformedInput']
-  Skips single /pieces of the malformed chunk/, one at a time, until parsing
-  succeds. It requests a new input from upstream if needed. Compare this
-  behavior with that of 'skipMalformedChunks', which skips /the entire
-  malformed chunk/.
+['retryLeftovers]
+   On parsing failures, keep retrying with any left-over input, skipping
+   individual bits each time. If there are no left-overs, then more
+   input is requestsd form upstream.
 
   > helloPipe2 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
-  > helloPipe2 = parserInputD >-> skipMalformedInput >-> parserD hello
+  > helloPipe2 = parserInputD >-> retryLeftovers >-> parserD hello
 
   >>> runProxy $ fromListS input2 >-> helloPipe2 >-> printD
   Name "Amy"
@@ -265,11 +264,12 @@ These 'Proxy's that control the parsing behavior can be easily plugged
 together with @('>->')@ to achieve a combined functionality, Keep in
 mind that the order in which these 'Proxy's are used is important.
 
-Suppose you don't want to parse inputs of length longer than 10, and you
-also want to skip /small bits of malformed input/.
+Suppose you don't want to parse inputs of length longer than 10, and on
+parsing failures, you want to retry feeding the parser with any
+left-overs.
 
   > helloPipe5 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
-  > helloPipe5 = parserInputD >-> limitInputLength 10 >-> skipMalformedInput >-> parserD hello
+  > helloPipe5 = parserInputD >-> limitInputLength 10 >-> retryLeftovers >-> parserD hello
 
   >>> runProxy . runEitherK $ fromListS input2 >-> helloPipe5 >-> printD
   Name "Amy"
