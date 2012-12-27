@@ -40,6 +40,8 @@ test-suite tests
   build-depends:
     base (== 4.*),
     pipes (== 3.0.*),
+    attoparsec (== 0.10.*),
+    text (== 0.11.*),
     pipes-attoparsec,
     QuickCheck (== 2.5.*),
     HUnit (== 1.2.*),
