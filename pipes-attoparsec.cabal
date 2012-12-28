@@ -2,19 +2,26 @@ Name: pipes-attoparsec
 Version: 0.0.2
 License: BSD3
 License-file: LICENSE
-Author: Paolo Capriotti
-Maintainer: p.capriotti@gmail.com
+Copyright: Copyright (c) Paolo Capriotti 2012, Renzo Carbonara 2012
+Author: Paolo Capriotti, Renzo Carbonara
+Maintainer: renzocarbonaraλgmail.com
 Stability: Experimental
-Homepage: https://github.com/pcapriotti/pipes-extra
-Category: Text
+tested-with: GHC == 7.4.1
+Homepage: https://github.com/k0001/pipes-attoparsec
+Bug-reports: https://github.com/k0001/pipes-attoparsec
+Category: Text, Pipes, Parser
 Build-type: Simple
-Synopsis: Utilities to convert a parser into a pipe.
-Description: Utilities to convert a parser into a pipe.
 Cabal-version: >=1.8
+Synopsis: Utilities to convert an Attoparsec parser into a pipe Pipe.
+Description:
+  Utilities to convert an Attoparsec 'Data.Attoparsec.Types.Parser' into
+  a 'Control.Proxy.Synonym.Pipe'. See
+  "Control.Proxy.Attoparsec.Tutorial" for an extensive introduction with
+  examples.
 
 Source-Repository head
     Type: git
-    Location: https://github.com/pcapriotti/pipes-extra
+    Location: git://github.com/k0001/pipes-extra.git
 
 Library
   Exposed-modules: Control.Proxy.Attoparsec
