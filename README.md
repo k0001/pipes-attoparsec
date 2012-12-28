@@ -1,1 +1,1 @@
-Utilities to convert a parser into a pipe.
+Utilities to convert an Attoparsec Parser into a Pipe.
