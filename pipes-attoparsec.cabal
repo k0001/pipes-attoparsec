@@ -25,7 +25,7 @@ Description:
 
 Source-Repository head
     Type: git
-    Location: git://github.com/k0001/pipes-extra.git
+    Location: git://github.com/k0001/pipes-attoparsec.git
 
 Library
   Exposed-modules: Control.Proxy.Attoparsec
