@@ -212,7 +212,7 @@ behavior just mentioned resembles the one provided by
 
 Here are some other examples:
 
-['retryLeftovers]
+['retryLeftovers']
    On parsing failures, keep retrying with any left-over input, skipping
    individual bits each time. If there are no left-overs, then more
    input is requestsd form upstream.
