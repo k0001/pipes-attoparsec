@@ -26,16 +26,11 @@ import qualified Data.Text                  as T
 
 -- | Status of a parsing 'Proxy'.
 data ParserStatus a
-  -- | There is no current parsing activity.
-  --
-  -- Receiving 'Resume' @a@ from upstream would feed input @a@ to a new
-  -- 'Parser'.
-  = Idle
-  -- | There is a 'Parser' running, waiting for more @a@ input.
+  -- | There is a 'Parser' running waiting for more @a@ input.
   --
   -- Receiving 'Resume' @a@ from upstream would feed input @a@ to the running
   -- 'Parser'.
-  | Parsing
+  = Parsing
     { psLength :: Int -- ^Length of input consumed so far.
     }
   -- | A 'Parser' has failed parsing.

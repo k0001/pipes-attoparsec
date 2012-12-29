@@ -24,8 +24,8 @@ skipMalformedChunks
   => ParserStatus a
   -> p (ParserStatus a) (ParserSupply a) (ParserStatus a) (ParserSupply a) m r
 skipMalformedChunks = runIdentityK . foreverK $ go
-  where go (Failed _ _)  = request Idle >>= respond . Start . supplyChunk
-        go x             = request x    >>= respond
+  where go x@(Failed _ _) = request x >>= respond . Start . supplyChunk
+        go x              = request x >>= respond
 
 
 -- | If a downstream parsing 'Proxy' reports a parsing failure, then

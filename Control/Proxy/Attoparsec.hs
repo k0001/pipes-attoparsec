@@ -72,27 +72,22 @@ parserInputD _ = runIdentityP . forever $ request () >>= respond . Resume
 parserD :: (Proxy p, Monad m, AttoparsecInput a)
         => Parser a b
         -> () -> p (ParserStatus a) (ParserSupply a) () b m r
-parserD parser () = runIdentityP . forever $ start Idle
+parserD parser () = runIdentityP . forever $ ask k0 0 (Parsing 0)
   where
-    start = req $ parse parser
-    req k status = request' status >>= \ps -> case ps of
-      Start  chunk -> processNew chunk
-      Resume chunk -> process (parsedLength status) k chunk
-    request' status = do
-      ps <- request status
-      if null (supplyChunk ps) then request' status
-                               else return ps
-    processNew = process 0 $ parse parser
-    process plen k chunk = case k chunk of
-        Partial k'        -> req k' $ Parsing (plen + length chunk)
-        Fail rest ctx msg -> start $ Failed rest (ParserError ctx msg)
-        Done rest result  -> do
-          respond result
-          if null rest then start Idle
-                       else processNew rest
+    k0 = parse parser
 
--- | Length of input parsed so far.
-parsedLength :: ParserStatus a -> Int
-parsedLength (Parsing n) = n
-parsedLength _           = 0
+    requestNonEmpty status = go where
+      go = do ps <- request status
+              if null (supplyChunk ps) then go else return ps
+
+    ask k len status = do
+      ps <- requestNonEmpty status
+      case ps of
+        Start  chunk -> use (k0 chunk) 0
+        Resume chunk -> use (k  chunk) (len + length chunk)
+
+    use (Partial k)         len = ask k  len $ Parsing len
+    use (Fail rest ctx msg) _   = ask k0 0   $ Failed rest (ParserError ctx msg)
+    use (Done rest result)  _   = respond result >> use (k0 rest) 0
+
 
