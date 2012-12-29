@@ -18,7 +18,7 @@ You may import this module and try the subsequent examples as you go.
 >    -- ** Composing
 >    -- $example-compose-control
 >
->    -- ** Roll your own
+>    -- ** Custom behavior
 >    -- $example-control-custom
 >
 >    -- * Try for yourself
@@ -129,7 +129,7 @@ We are done with our parser, now lets make a simple parsing 'Pipe' with it.
   > helloPipe1 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
   > helloPipe1 = parserInputD >-> parserD hello
 
-As the type indicates, this 'Pipe' recieves 'Text' values from upstream and
+As the type indicates, this 'Pipe' receives 'Text' values from upstream and
 sends 'Name' values downstream. This 'Pipe' is made of two smaller
 two smaller cooperating 'Proxy's:
 
@@ -167,7 +167,7 @@ Attoparsec's 'Parser' handles partial parsing just fine.
   Name "Jeff"
   Name "Tom"
 
-We have acomplished our simple goal: We've made a 'Pipe' that parses
+We have accomplished our simple goal: We've made a 'Pipe' that parses
 downstream flowing input using our 'Parser' 'hello'.
 
 
@@ -204,7 +204,7 @@ sometimes you may prefer to act differently on these extraordinary
 situations.
 
 Instead of just using 'parserInputD' and 'parserD' to build our
-'helloPipe1', we could have used an additional 'Proxy' in beween them to
+'helloPipe1', we could have used an additional 'Proxy' in between them to
 handle these situations. The module "Control.Proxy.Attoparsec.Control"
 exports some useful 'Proxy's that serve this purpose. The default
 behavior just mentioned resembles the one provided by
@@ -215,7 +215,7 @@ Here are some other examples:
 ['retryLeftovers']
    On parsing failures, keep retrying with any left-over input, skipping
    individual bits each time. If there are no left-overs, then more
-   input is requestsd form upstream.
+   input is requests form upstream.
 
   > helloPipe2 :: (Proxy p, Monad m) => () -> Pipe p Text Name m r
   > helloPipe2 = parserInputD >-> retryLeftovers >-> parserD hello
@@ -261,7 +261,7 @@ Here are some other examples:
 $example-compose-control
 
 These 'Proxy's that control the parsing behavior can be easily plugged
-together with @('>->')@ to achieve a combined functionality, Keep in
+together with @('>->')@ to achieve a combined functionality. Keep in
 mind that the order in which these 'Proxy's are used is important.
 
 Suppose you don't want to parse inputs of length longer than 10, and on
@@ -280,18 +280,22 @@ left-overs.
 
 $example-control-custom
 
-In case the parsing control 'Proxy's provided by
-"Control.Proxy.Attoparsec.Control" are not enough for your needs, you
-can easily roll your own.
+In case the 'Proxy's provided by "Control.Proxy.Attoparsec.Control" are not
+enough for your needs, you can create your custom parsing control 'Proxy'.
 
-A parsing control 'Proxy' receives a @'ParserStatus' a@ from downstream
-reporting the status of a 'parserD' parsing 'Proxy', and in exchange it should
-respond with a @'ParserSupply' a@ value, which holds both the input to be
-parsed and directives on whether the current parsing activity should be resumed
-using the given input, or if instead, a new 'Parser' should be started and the
-input fed to it. Any of these values might be changed on their way through this
-new 'Proxy'. See the documentation about 'ParserStatus' and 'ParserSupply' for
-more details.
+Through a parsing control 'Proxy',  @'ParserStatus' a@ values flow
+upstream and @'ParserSupply' a@ values flow downstream.  A parsing control
+'Proxy' simply alters these values or their flow to achieve its purpose. A
+@'ParserStatus' a@ value received from downstream reports the status of a
+'parserD' parsing 'Proxy', and in exchange, downstream expects a @'ParserSupply'
+a@ value.
+
+@'ParserSupply' a@ values carry raw input to be parsed and directives on how it
+should be used: it may be fed to an ongoing parsing activity waiting for more
+input, or it may be fed to a newly started parser, effectively aborting any
+parsing activity currently waiting for more input.
+
+See the documentation about 'ParserStatus' and 'ParserSupply' for more details.
 
 Suppose you want to write a parsing control 'Proxy' that never provides
 additional input to partial parsing results. Let's first take a look at the
@@ -302,23 +306,24 @@ type of this 'Proxy':
   >  => ParserStatus a
   >  -> p (ParserStatus a) (ParserSupply a) (ParserStatus a) (ParserSupply a) m r
 
-Remember, a parsing control 'Proxy' just forwards @'ParserStatus' a@ values
-upstream and @'ParserSupply' a@ values downstream, optionaly replacing them by
-new values. In our case, if we receive @'Parsing' n@ from downstream, then we
-know there is a partial parsing result waiting for more input. If we were to
-respond to this request with a @'Resume' a@ value, then the partial parsing
-would continue, but if we change our response to @'Start' a@, then the partial
-parsing would be aborted and a new parsing activity would start consuming the
-given input. The code is straigthforward:
+Just like we said, @'ParserStatus' a@ values flow upstream and @'ParserSupply'
+a@ values flow downstream.
+
+Now to a simple implementation: If we receive @'Parsing' n@ from downstream,
+then we know there is a partial parsing result waiting for more input. If we
+were to respond to this request with a @'Resume' a@ value, then the partial
+parsing would continue, but if we change our response to @'Start' a@, then the
+partial parsing would be aborted and a new parsing activity would start
+consuming the given input. A simple implementation is quite straightforward:
 
   > skipPartialResults = runIdentityK . foreverK $ go
   >   where go x@(Parsing _) = request x >>= respond . Start . supplyChunk
   >         go x             = request x >>= respond
 
-We forward upstream the request we got from downstream, then we use
-'supplyChunk' to extract the input /chunk/ from a @'ParserSupply' a@ received
-from upstream, and finally we use 'Start' to construct our new desired
-@'ParserSupply' a@ value before responding.
+We forward upstream the requests we get from downstream, then in the case of a
+@'Parsing' n@ status, we use 'supplyChunk' to extract the input /chunk/ from the
+@'ParserSupply' a@ received from upstream, and finally we use 'Start' to
+construct our new desired @'ParserSupply' a@ value before responding.
 
 Now we can use this parsing control 'Proxy' with some simple input and see it
 working.

@@ -1,5 +1,5 @@
 -- | This module provides utilities to turn your Attoparsec @'Parser' a
--- b@ into a 'Pipe' that parses 'a' values into 'b' values as they flow
+-- b@ into a 'Pipe' that parses @a@ values into @b@ values as they flow
 -- downstream.
 --
 -- See "Control.Proxy.Attoparsec.Tutorial" for an extensive introduction
