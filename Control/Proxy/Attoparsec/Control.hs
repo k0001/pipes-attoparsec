@@ -42,7 +42,7 @@ retryLeftovers = runIdentityK . foreverK $ go
     go s              = request s >>= respond
 
     retry s@(Failed rest _) = do
-      s' <- respond $ Resume rest
+      s' <- respond $ Start rest
       if s' == s then return s
                  else retry s'
     retry s = return s
