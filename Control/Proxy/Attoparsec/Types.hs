@@ -69,7 +69,7 @@ supplyChunk (Resume x) = x
 -- | Reasons for an input value to be unnaceptable.
 data BadInput
   = InputTooLong
-    { itlLenght :: Int -- ^ Length of the input.
+    { itlLength :: Int -- ^ Length of the input.
     }
   | MalformedInput
     { miParserErrror :: ParserError -- ^ Error found while parsing.
