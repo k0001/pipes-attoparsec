@@ -40,14 +40,14 @@ Library
     text
 
   ghc-options:
-    -Wall -threaded -rtsopts -fno-warn-missing-signatures
+    -Wall -fno-warn-missing-signatures
 
 test-suite tests
   type:           exitcode-stdio-1.0
   hs-source-dirs: tests
   main-is:        Main.hs
   ghc-options:
-    -Wall -threaded -rtsopts -fno-warn-missing-signatures
+    -Wall -rtsopts -fno-warn-missing-signatures
 
   build-depends:
     base (== 4.*),
