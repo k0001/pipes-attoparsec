@@ -28,6 +28,7 @@ Source-Repository head
     Location: git://github.com/k0001/pipes-attoparsec.git
 
 Library
+  Hs-source-dirs:  src
   Exposed-modules: Control.Proxy.Attoparsec
                    Control.Proxy.Attoparsec.Control
                    Control.Proxy.Attoparsec.Tutorial
