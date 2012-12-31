@@ -266,7 +266,7 @@ mind that the order in which these 'Proxy's are used is important.
 
 Suppose you don't want to parse inputs of length longer than 10, and on
 parsing failures, you want to retry feeding the parser with any
-left-overs.
+left-overs. You could achieve that behaviour like this:
 
   > helloPipe5 :: (Proxy p, Monad m) => () -> Pipe (EitherP BadInput p) Text Name m r
   > helloPipe5 = parserInputD >-> limitInputLength 10 >-> retryLeftovers >-> parserD hello
@@ -284,11 +284,11 @@ In case the 'Proxy's provided by "Control.Proxy.Attoparsec.Control" are not
 enough for your needs, you can create your custom parsing control 'Proxy'.
 
 Through a parsing control 'Proxy',  @'ParserStatus' a@ values flow
-upstream and @'ParserSupply' a@ values flow downstream.  A parsing control
-'Proxy' simply replace these values or their flow to achieve its purpose. A
-@'ParserStatus' a@ value received from downstream reports the status of a
-'parserD' parsing 'Proxy', and in exchange, downstream expects a @'ParserSupply'
-a@ value.
+upstream and @'ParserSupply' a@ values flow downstream.  A parsing
+control 'Proxy' may use, replace, or alter the flow of these values to
+achieve its purpose. A @'ParserStatus' a@ value received from downstream
+reports the status of a 'parserD' parsing 'Proxy', and in exchange,
+downstream expects a @'ParserSupply' a@ value.
 
 @'ParserSupply' a@ values carry raw input to be parsed and directives on how it
 should be used. @'ParserSupply' a@ is just a type synonym for
