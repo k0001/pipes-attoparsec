@@ -1,5 +1,5 @@
 name: pipes-attoparsec
-version: 0.1.0.0
+version: 0.1.0.1
 license: BSD3
 license-file: LICENSE
 copyright: Copyright (c) Paolo Capriotti 2012-2012,
@@ -10,7 +10,7 @@ stability: Experimental
 tested-with: GHC ==7.4.1, GHC ==7.6.1
 homepage: https://github.com/k0001/pipes-attoparsec
 bug-reports: https://github.com/k0001/pipes-attoparsec
-category: Text, Pipes, Parser
+category: Pipes, Parser
 build-type: Simple
 cabal-version: >=1.8
 synopsis: Utilities to convert an Attoparsec parser into a pipe Pipe.
