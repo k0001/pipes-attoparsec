@@ -1,20 +1,20 @@
-Name: pipes-attoparsec
-Version: 0.1.0
-License: BSD3
-License-file: LICENSE
-Copyright: Copyright (c) Paolo Capriotti 2012-2012,
+name: pipes-attoparsec
+version: 0.1.0
+license: BSD3
+license-file: LICENSE
+copyright: Copyright (c) Paolo Capriotti 2012-2012,
                          Renzo Carbonara 2012-
-Author: Paolo Capriotti, Renzo Carbonara
-Maintainer: renzocarbonaraλgmail.com
-Stability: Experimental
+author: Paolo Capriotti, Renzo Carbonara
+maintainer: renzocarbonaraλgmail.com
+stability: Experimental
 tested-with: GHC ==7.4.1, GHC ==7.6.1
-Homepage: https://github.com/k0001/pipes-attoparsec
-Bug-reports: https://github.com/k0001/pipes-attoparsec
-Category: Text, Pipes, Parser
-Build-type: Simple
-Cabal-version: >=1.8
-Synopsis: Utilities to convert an Attoparsec parser into a pipe Pipe.
-Description:
+homepage: https://github.com/k0001/pipes-attoparsec
+bug-reports: https://github.com/k0001/pipes-attoparsec
+category: Text, Pipes, Parser
+build-type: Simple
+cabal-version: >=1.8
+synopsis: Utilities to convert an Attoparsec parser into a pipe Pipe.
+description:
   Utilities to convert an Attoparsec 'Data.Attoparsec.Types.Parser' into
   a 'Control.Proxy.Synonym.Pipe'.
   .
@@ -23,17 +23,17 @@ Description:
   .
   Version 0.1.* is not backwards compatible with previous versions.
 
-Source-Repository head
-    Type: git
-    Location: git://github.com/k0001/pipes-attoparsec.git
+source-repository head
+    type: git
+    location: git://github.com/k0001/pipes-attoparsec.git
 
-Library
-  Hs-source-dirs:  src
-  Exposed-modules: Control.Proxy.Attoparsec
+library
+  hs-source-dirs:  src
+  exposed-modules: Control.Proxy.Attoparsec
                    Control.Proxy.Attoparsec.Control
                    Control.Proxy.Attoparsec.Tutorial
                    Control.Proxy.Attoparsec.Types
-  Build-depends:
+  build-depends:
     base (==4.*),
     pipes (>=3.0),
     attoparsec (>=0.10),
