@@ -285,7 +285,7 @@ enough for your needs, you can create your custom parsing control 'Proxy'.
 
 Through a parsing control 'Proxy',  @'ParserStatus' a@ values flow
 upstream and @'ParserSupply' a@ values flow downstream.  A parsing control
-'Proxy' simply alters these values or their flow to achieve its purpose. A
+'Proxy' simply replace these values or their flow to achieve its purpose. A
 @'ParserStatus' a@ value received from downstream reports the status of a
 'parserD' parsing 'Proxy', and in exchange, downstream expects a @'ParserSupply'
 a@ value.
