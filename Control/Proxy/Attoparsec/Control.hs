@@ -24,7 +24,7 @@ skipMalformedChunks
   => ParserStatus a
   -> p (ParserStatus a) (ParserSupply a) (ParserStatus a) (ParserSupply a) m r
 skipMalformedChunks = runIdentityK . foreverK $ go
-  where go x@(Failed _ _) = request x >>= respond . Start . supplyChunk
+  where go x@(Failed _ _) = request x >>= \(_,a) -> respond (Start, a)
         go x              = request x >>= respond
 
 
@@ -42,7 +42,7 @@ retryLeftovers = runIdentityK . foreverK $ go
     go s              = request s >>= respond
 
     retry s@(Failed rest _) = do
-      s' <- respond $ Start rest
+      s' <- respond (Start, rest)
       if s' == s then return s
                  else retry s'
     retry s = return s
@@ -51,7 +51,7 @@ retryLeftovers = runIdentityK . foreverK $ go
       let rest' = drop 1 rest
       if null rest'
         then request s
-        else return $ Start rest'
+        else return (Start, rest')
     moreSupply s = request s
 
 

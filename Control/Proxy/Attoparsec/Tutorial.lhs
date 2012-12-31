@@ -95,7 +95,7 @@ You may import this module and try the subsequent examples as you go.
 >  => ParserStatus a
 >  -> p (ParserStatus a) (ParserSupply a) (ParserStatus a) (ParserSupply a) m r
 > skipPartialResults = runIdentityK . foreverK $ go
->   where go x@(Parsing _) = request x >>= respond . Start . supplyChunk
+>   where go x@(Parsing _) = request x >>= \(_, a) -> respond (Start, a)
 >         go x             = request x >>= respond
 
 
@@ -291,9 +291,11 @@ upstream and @'ParserSupply' a@ values flow downstream.  A parsing control
 a@ value.
 
 @'ParserSupply' a@ values carry raw input to be parsed and directives on how it
-should be used: it may be fed to an ongoing parsing activity waiting for more
-input, or it may be fed to a newly started parser, effectively aborting any
-parsing activity currently waiting for more input.
+should be used. @'ParserSupply' a@ is just a type synonym for
+@('SupplyUse', a)@. The @a@ value is the input chunk, and the 'SupplyUse' value
+could be either 'Resume' if the parser currently waiting for input should be
+fed, or 'Start', if a new parser should be started and fed the input,
+effectively aborting any parsing activity currently waiting for more input.
 
 See the documentation about 'ParserStatus' and 'ParserSupply' for more details.
 
@@ -311,19 +313,18 @@ a@ values flow downstream.
 
 Now to a simple implementation: If we receive @'Parsing' n@ from downstream,
 then we know there is a partial parsing result waiting for more input. If we
-were to respond to this request with a @'Resume' a@ value, then the partial
-parsing would continue, but if we change our response to @'Start' a@, then the
-partial parsing would be aborted and a new parsing activity would start
+were to respond to this request with @('Resume', a)@, then the partial parser
+would continue consuming input, but if we change our response to @('Start', a)@,
+then the partial parser would be aborted and a new parser would start
 consuming the given input. A simple implementation is quite straightforward:
 
   > skipPartialResults = runIdentityK . foreverK $ go
-  >   where go x@(Parsing _) = request x >>= respond . Start . supplyChunk
+  >   where go x@(Parsing _) = request x >>= \(_, a) -> respond (Start, a)
   >         go x             = request x >>= respond
 
-We forward upstream the requests we get from downstream, then in the case of a
-@'Parsing' n@ status, we use 'supplyChunk' to extract the input /chunk/ from the
-@'ParserSupply' a@ received from upstream, and finally we use 'Start' to
-construct our new desired @'ParserSupply' a@ value before responding.
+We forward upstream the requests we get from downstream. However, in the case
+of a @'Parsing' n@ status, we replace with 'Start' the first value in the
+@'ParserSupply' a@ pair we receive from upstream before responding.
 
 Now we can use this parsing control 'Proxy' with some simple input and see it
 working.

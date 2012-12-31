@@ -58,7 +58,7 @@ import           Prelude                          hiding (length, null)
 -- received from downstream.
 parserInputD :: (Monad m, Proxy p)
              => ParserStatus a -> p () a (ParserStatus a) (ParserSupply a) m r
-parserInputD _ = runIdentityP . forever $ request () >>= respond . Resume
+parserInputD _ = runIdentityP . forever $ request () >>= respond . (,) Resume
 
 
 -- | 'Proxy' using the given @'Parser' a b@ to repeatedly parse pieces
@@ -77,14 +77,15 @@ parserD parser () = runIdentityP . forever $ ask k0 0 (Parsing 0)
     k0 = parse parser
 
     requestNonEmpty status = go where
-      go = do ps <- request status
-              if null (supplyChunk ps) then go else return ps
+      go = do
+        ps@(_, chunk) <- request status
+        if null chunk then go else return ps
 
     ask k len status = do
-      ps <- requestNonEmpty status
-      case ps of
-        Start  chunk -> use (k0 chunk) 0
-        Resume chunk -> use (k  chunk) (len + length chunk)
+      (su, chunk) <- requestNonEmpty status
+      case su of
+        Start  -> use (k0 chunk) 0
+        Resume -> use (k  chunk) (len + length chunk)
 
     use (Partial k)         len = ask k  len $ Parsing len
     use (Fail rest ctx msg) _   = ask k0 0   $ Failed rest (ParserError ctx msg)

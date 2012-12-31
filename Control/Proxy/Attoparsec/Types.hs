@@ -7,8 +7,8 @@
 module Control.Proxy.Attoparsec.Types
   ( -- * Proxy control
     ParserStatus(..)
-  , ParserSupply(..)
-  , supplyChunk
+  , SupplyUse(..)
+  , ParserSupply
     -- * Error types
   , BadInput(..)
     -- * Attoparsec integration
@@ -26,17 +26,17 @@ import qualified Data.Text                  as T
 
 -- | Status of a parsing 'Proxy'.
 data ParserStatus a
-  -- | There is a 'Parser' running waiting for more @a@ input.
+  -- | There is a 'Parser' running and waiting for more @a@ input.
   --
-  -- Receiving 'Resume' @a@ from upstream would feed input @a@ to the running
-  -- 'Parser'.
+  -- Receiving @('Resume', a)@ from upstream would feed input @a@ to the 'Parser'
+  -- waiting for more input.
   = Parsing
     { psLength :: Int -- ^Length of input consumed so far.
     }
   -- | A 'Parser' has failed parsing.
   --
-  -- Receiving 'Resume' @a@ from upstream would feed input @a@ to a new
-  -- 'Parser'.
+  -- Receiving @('Resume', a)@ from upstream would feed input @a@ to a newly
+  -- started 'Parser'.
   | Failed
     { psLeftover :: a -- ^Input not yet consumed when the failure occurred.
     , psError    :: ParserError -- ^Error found while parsing.
@@ -50,20 +50,19 @@ data ParserError = ParserError
     } deriving (Show, Eq)
 
 
--- | Input chunk supplied to the 'ParsingProxy'.
-data ParserSupply a
-  = Start a
-  -- ^ Start a new parsing activity, feed it with @a@.
-  | Resume a
-  -- ^ Feed @a@ to the current parsing activity, as explained by
-  -- 'ParserStatus'.
-  deriving (Show, Eq, Functor)
+-- | Indicates how should a parsing 'Proxy' use new input.
+data SupplyUse
+  -- | Start a new parser and fed any new input to it.
+  = Start
+  -- | Resume feeding any new input to the current parser waiting for input.
+  | Resume
+  deriving (Eq, Show)
 
 
--- | Get the input chunk from any 'ParserSupply' value.
-supplyChunk :: ParserSupply a -> a
-supplyChunk (Start  x) = x
-supplyChunk (Resume x) = x
+-- | Input supplied to a parsing 'Proxy'.
+--
+-- The 'SupplyUse' value indicates how the @a@ input chunk should be used.
+type ParserSupply a = (SupplyUse, a)
 
 
 -- | Reasons for an input value to be unnaceptable.
