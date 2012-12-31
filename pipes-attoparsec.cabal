@@ -13,10 +13,10 @@ bug-reports: https://github.com/k0001/pipes-attoparsec
 category: Pipes, Parser
 build-type: Simple
 cabal-version: >=1.8
-synopsis: Utilities to convert an Attoparsec parser into a pipe Pipe.
+synopsis: Utilities to convert an Attoparsec parser into a pipes's Pipe.
 description:
   Utilities to convert an Attoparsec 'Data.Attoparsec.Types.Parser' into
-  a 'Control.Proxy.Synonym.Pipe'.
+  a @pipes@' 'Control.Proxy.Synonym.Pipe'.
   .
   See "Control.Proxy.Attoparsec.Tutorial" for an extensive introduction with
   examples.
