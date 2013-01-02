@@ -1,0 +1,11 @@
+*.swp
+*.swn
+*.swo
+*~
+cabal-dev
+dist
+*.prof
+*.eventlog
+*.hi
+*.o
+TAGS
