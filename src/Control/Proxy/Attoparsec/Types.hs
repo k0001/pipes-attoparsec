@@ -108,7 +108,7 @@ instance AttoparsecInput T.Text where
 
 -- | Run a parser with an initial input string, and a monadic action
 -- that can supply more input if needed.
-parseWith :: (Monad m, AttoparsecInput a, Show a)
+parseWith :: (Monad m, AttoparsecInput a)
           => m a
           -- ^ An action that will be executed to provide the parser
           -- with more input, if necessary. If the action returns an
@@ -116,20 +116,20 @@ parseWith :: (Monad m, AttoparsecInput a, Show a)
           -> Parser a b
           -> Maybe a
           -- ^ Optional initial input for the parser.
-          -> m (Maybe a, Either ([String], String) b)
+          -> m (Maybe a, Either ParserError b)
 parseWith refill p Nothing  = parseWith refill p . Just =<< refill
 parseWith refill p (Just s) = step $ parse p s
   where
     step (Partial k)  = step . k =<< refill
     step (Done t r)   = return (mayChunk t, Right r)
-    step (Fail t c m) = return (mayChunk t, Left (c, m))
+    step (Fail t c m) = return (mayChunk t, Left (ParserError c m))
 
     mayChunk t | null t    = Nothing
                | otherwise = Just t
 
 -- | 'parseWith' with the order of arguments changed.
-parsingWith :: (Monad m, AttoparsecInput a, Show a)
+parsingWith :: (Monad m, AttoparsecInput a)
             => Parser a b -> Maybe a -> m a
-            -> m (Maybe a, Either ([String], String) b)
+            -> m (Maybe a, Either ParserError b)
 parsingWith p ms refill = parseWith refill p ms
 
