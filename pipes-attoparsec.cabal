@@ -35,12 +35,14 @@ library
                    Control.Proxy.Attoparsec.Control
                    Control.Proxy.Attoparsec.Tutorial
                    Control.Proxy.Attoparsec.Types
+                   Control.Proxy.Trans.Attoparsec
   build-depends:
     base (==4.*),
     pipes (>=3.0),
     attoparsec (>=0.10),
     bytestring,
-    text
+    text,
+    transformers (>=0.3)
 
   ghc-options:
     -Wall -fno-warn-missing-signatures
@@ -65,3 +67,4 @@ test-suite tests
     test-framework (>= 0.6),
     test-framework-quickcheck2 (>= 0.2),
     test-framework-hunit (>= 0.2)
+
