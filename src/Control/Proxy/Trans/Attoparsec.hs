@@ -92,11 +92,15 @@ type AttoparsecP a = ParseP ParserError (Maybe a)
 
 
 -- | Get any leftovers from the 'AttoparsecP' state.
-getLeftovers :: (Monad m, P.Proxy p) => (AttoparsecP a p) a' a b' b m (Maybe a)
+getLeftovers
+  :: (Monad m, P.Proxy p, AttoparsecInput a)
+  => (AttoparsecP a p) a' a b' b m (Maybe a)
 getLeftovers = get
 
 -- | Pop any leftovers from the 'AttoparsecP' state.
-popLeftovers :: (Monad m, P.Proxy p) => (AttoparsecP a p) a' a b' b m (Maybe a)
+popLeftovers
+  :: (Monad m, P.Proxy p, AttoparsecInput a)
+  => (AttoparsecP a p) a' a b' b m (Maybe a)
 popLeftovers = do { s <- get; put Nothing; return s }
 
 
