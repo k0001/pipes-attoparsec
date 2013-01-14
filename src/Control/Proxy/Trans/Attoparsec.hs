@@ -2,10 +2,19 @@
 
 
 module Control.Proxy.Trans.Attoparsec
-  ( ParseP(..)
-  , AttoparsecP
+  ( -- * ParseP proxy transformer
+    ParseP(..)
   , runParseP
   , runParseK
+    -- ** StateP support
+  , get
+  , put
+  , modify
+  , gets
+    -- ** AttoparsecP proxy transformer
+  , AttoparsecP
+  , getLeftovers
+  , popLeftovers
   , parsePC
   ) where
 
@@ -25,6 +34,7 @@ import qualified Control.Proxy.Trans.Either as E
 import qualified Control.Proxy.Trans.State  as S
 
 
+-- | An Either-State proxy transformer on which 'AttoparsecP' builds.
 newtype ParseP e s p a' a b' b m r
   = ParseP { unParseP :: E.EitherP e (S.StateP s p) a' a b' b m r }
   deriving
@@ -64,7 +74,31 @@ runParseP
 runParseP s = S.runStateP s . E.runEitherP . unParseP
 
 
+get :: (Monad m, P.Proxy p) => ParseP e s p a' a b' b m s
+get = gets id
+
+put :: (Monad m, P.Proxy p) => s -> ParseP e s p a' a b' b m ()
+put = ParseP . E.EitherP . fmap Right . S.put
+
+modify :: (Monad m, P.Proxy p) => (s -> s) -> ParseP e s p a' a b' b m ()
+modify = ParseP . E.EitherP . fmap Right . S.modify
+
+gets :: (Monad m, P.Proxy p) => (s -> r) ->ParseP e s p a' a b' b m r
+gets = ParseP . E.EitherP . fmap Right . S.gets
+
+
+-- | 'ParseP' specialized for Attoparsec integration.
 type AttoparsecP a = ParseP ParserError (Maybe a)
+
+
+-- | Get any leftovers from the 'AttoparsecP' state.
+getLeftovers :: (Monad m, P.Proxy p) => (AttoparsecP a p) a' a b' b m (Maybe a)
+getLeftovers = get
+
+-- | Pop any leftovers from the 'AttoparsecP' state.
+popLeftovers :: (Monad m, P.Proxy p) => (AttoparsecP a p) a' a b' b m (Maybe a)
+popLeftovers = do { s <- get; put Nothing; return s }
+
 
 -- | Consume and parse input from upstream until parsing succeeds or fails.
 parsePC
@@ -73,6 +107,4 @@ parsePC
   -> P.Consumer (AttoparsecP a p) a m r
 parsePC parser = ParseP . E.EitherP . S.StateP . P.runIdentityK $ go
   where go s = parsingWith parser s $ P.request ()
-
-
 
