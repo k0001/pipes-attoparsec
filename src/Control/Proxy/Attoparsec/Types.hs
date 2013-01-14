@@ -24,7 +24,7 @@ import qualified Data.Attoparsec.Text       as AT
 import           Data.Attoparsec.Types
 import qualified Data.ByteString            as BS
 import qualified Data.Text                  as T
-import           Prelude                    hiding (null)
+import           Prelude                    hiding (null, splitAt)
 
 
 -- | Status of a parsing 'Proxy'.
@@ -85,20 +85,30 @@ class Eq a => AttoparsecInput a where
     parse :: Parser a b -> a -> IResult a b
     -- | Tests whether @a@ is empty.
     null :: a -> Bool
+    -- | Take the first @n@ elements from @a@ and skip the rest.
+    take :: Int -> a -> a
+    take n = fst . splitAt n
     -- | Skips the first @n@ elements from @a@ and returns the rest.
     drop :: Int -> a -> a
+    drop n = snd . splitAt n
+    -- | Equivalent to @('take' n xs, 'drop' n xs)@.
+    splitAt :: Int -> a -> (a,a)
     -- | Number of elements in @a@.
     length :: a -> Int
 
 instance AttoparsecInput BS.ByteString where
     parse = ABS.parse
     null = BS.null
+    splitAt = BS.splitAt
+    take = BS.take
     drop = BS.drop
     length = BS.length
 
 instance AttoparsecInput T.Text where
     parse = AT.parse
     null = T.null
+    splitAt = T.splitAt
+    take = T.take
     drop = T.drop
     length = T.length
 
