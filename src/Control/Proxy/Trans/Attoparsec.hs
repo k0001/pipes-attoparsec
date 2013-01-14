@@ -15,23 +15,25 @@ module Control.Proxy.Trans.Attoparsec
   , AttoparsecP
   , getLeftovers
   , popLeftovers
+  , takeLeftovers
   , parsePC
   ) where
 
 
-import           Control.Applicative        (Applicative)
-import           Control.MFunctor           (MFunctor)
-import           Control.Monad.IO.Class     (MonadIO)
-import           Control.Monad              (MonadPlus)
-import           Control.Monad.Trans.Class  (MonadTrans)
-import           Control.PFunctor           (PFunctor(..))
+import           Control.Applicative            (Applicative)
+import           Control.MFunctor               (MFunctor)
+import           Control.Monad                  (MonadPlus)
+import           Control.Monad.IO.Class         (MonadIO)
+import           Control.Monad.Trans.Class      (MonadTrans)
+import           Control.PFunctor               (PFunctor (..))
+import qualified Control.Proxy                  as P
 import           Control.Proxy.Attoparsec.Types
-import           Control.Proxy.Class        (Proxy, MonadPlusP, MonadIOP)
-import           Control.Proxy.Trans        (ProxyTrans(..))
-import           Data.Attoparsec.Types      (Parser)
-import qualified Control.Proxy              as P
-import qualified Control.Proxy.Trans.Either as E
-import qualified Control.Proxy.Trans.State  as S
+import           Control.Proxy.Class            (MonadIOP, MonadPlusP, Proxy)
+import           Control.Proxy.Trans            (ProxyTrans (..))
+import qualified Control.Proxy.Trans.Either     as E
+import qualified Control.Proxy.Trans.State      as S
+import           Data.Attoparsec.Types          (Parser)
+import           Prelude                        hiding (splitAt)
 
 
 -- | An Either-State proxy transformer on which 'AttoparsecP' builds.
@@ -102,6 +104,16 @@ popLeftovers
   :: (Monad m, P.Proxy p, AttoparsecInput a)
   => (AttoparsecP a p) a' a b' b m (Maybe a)
 popLeftovers = do { s <- get; put Nothing; return s }
+
+-- | Pop input up to length @n@ from leftovers, if any, and leave the rest.
+takeLeftovers
+  :: (Monad m, P.Proxy p, AttoparsecInput a)
+  => Int -> (AttoparsecP a p) a' a b' b m (Maybe a)
+takeLeftovers n = do
+  lo <- getLeftovers
+  case fmap (splitAt n) lo of
+    Nothing    -> return Nothing
+    Just (p,s) -> put (mayInput s) >> return (mayInput p)
 
 
 -- | Consume and parse input from upstream until parsing succeeds or fails.
