@@ -45,7 +45,7 @@ library
     transformers (>=0.3)
 
   ghc-options:
-    -Wall -fno-warn-missing-signatures
+    -Wall -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-name-shadowing
 
 test-suite tests
   type:           exitcode-stdio-1.0
