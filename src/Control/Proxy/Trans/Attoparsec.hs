@@ -140,17 +140,12 @@ takeInputWithLeftoversD
 takeInputWithLeftoversD n ()
   | n <= 0    = return ()
   | otherwise = do
-      mlo <- getLeftovers
+      mlo <- takeLeftovers n
       case mlo of
         Nothing -> fromUpstream n
-        Just lo -> fromLeftovers n lo >>= fromUpstream
+        Just lo -> P.respond lo >> fromUpstream (n - length lo)
   where
     fromUpstream n = takeInputD n () >>= put
-    fromLeftovers n lo = do
-      let (p,s) = splitAt n lo
-      P.respond p
-      put (mayInput s)
-      return (n - length p)
 
 
 -- | Consume and parse input from upstream until parsing succeeds or fails.
