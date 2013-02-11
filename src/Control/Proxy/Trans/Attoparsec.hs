@@ -96,7 +96,7 @@ gets = ParseP . E.EitherP . fmap Right . S.gets
 takeInputD
   :: (Monad m, Proxy p, AttoparsecInput a)
   => Int -> () -> P.Pipe p a a m (Maybe a)
-takeInputD n = P.runIdentityK (go n) where
+takeInputD = P.runIdentityK . go where
   go n ()
     | n <= 0    = return Nothing
     | otherwise = do
