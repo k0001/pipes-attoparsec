@@ -11,14 +11,12 @@ module Control.Proxy.Trans.Attoparsec
   , put
   , modify
   , gets
-    -- ** Attoparsec support
-  , takeInputD
     -- ** AttoparsecP proxy transformer
   , AttoparsecP
   , getLeftovers
   , popLeftovers
   , takeLeftovers
-  , takeInputWithLeftoversD
+  , takeInputD
   , parsePC
   , parseP
   ) where
@@ -95,10 +93,10 @@ gets = ParseP . E.EitherP . fmap Right . S.gets
 
 
 -- | Pipe input flowing downstream up to length @n@. Return any leftovers.
-takeInputD
+takeInputD'
   :: (Monad m, Proxy p, AttoparsecInput a)
   => Int -> () -> P.Pipe p a a m (Maybe a)
-takeInputD = P.runIdentityK . go where
+takeInputD' = P.runIdentityK . go where
   go n ()
     | n <= 0    = return Nothing
     | otherwise = do
@@ -135,11 +133,12 @@ takeLeftovers n = do
     Nothing    -> return Nothing
     Just (p,s) -> put (mayInput s) >> return (mayInput p)
 
+
 -- | Pipe input flowing downstream up to length @n@, prepending any leftovers.
-takeInputWithLeftoversD
+takeInputD
   :: (Monad m, Proxy p, AttoparsecInput a)
   => Int -> () -> P.Pipe (AttoparsecP a p) a a m ()
-takeInputWithLeftoversD n ()
+takeInputD n ()
   | n <= 0    = return ()
   | otherwise = do
       mlo <- takeLeftovers n
@@ -147,7 +146,7 @@ takeInputWithLeftoversD n ()
         Nothing -> fromUpstream n
         Just lo -> P.respond lo >> fromUpstream (n - length lo)
   where
-    fromUpstream n = takeInputD n () >>= put
+    fromUpstream n = takeInputD' n () >>= put
 
 
 -- | Consume and parse input from upstream until parsing succeeds or fails.
