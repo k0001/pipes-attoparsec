@@ -24,9 +24,9 @@ pfours :: (Monad m, P.Proxy p) => () -> P.Pipe (PA.AttoparsecP T.Text p) T.Text 
 pfours () = forever $ P.respond =<< PA.parseP four
 
 
-type FoursTest = (Bool, String, [T.Text], [Char], Maybe T.Text)
+type ParseTest = (Bool, String, [T.Text], [Char], Maybe T.Text)
 
-assertFoursTest :: FoursTest -> Assertion
+assertFoursTest :: ParseTest -> Assertion
 assertFoursTest (ok, _, input, output, mlo) = assert . fromJust $ do
   let sess = PA.runParseK Nothing $ P.fromListS input >-> pfours
   ((epe,mlo'), res) <- P.runWriterT . P.runProxy $ sess >-> P.toListD
@@ -35,7 +35,7 @@ assertFoursTest (ok, _, input, output, mlo) = assert . fromJust $ do
       okRes = res == output
   return $ okMlo && okErr && okRes
 
-foursTests :: [FoursTest]
+foursTests :: [ParseTest]
 foursTests =
   [ (True  ,"0 chunk"                 ,[]              ,[]        ,Nothing)
   , (True  ,"1 chunk: Empty"          ,[""]            ,[]        ,Nothing)
@@ -58,9 +58,25 @@ foursTests =
   , (True  ,"3 chunk: One"            ,["a","a","aa"]  ,['a']     ,Nothing)
   ]
 
--- testCaseFoursTest :: FoursTest -> Test
-testCaseFoursTest ft@(ok,name,_,_,_) =
-  testCase name $ assertFoursTest ft
+-- testCaseFoursTest :: ParseTest -> Test
+testCaseFoursTest ft@(_,name,_,_,_) =
+  testCase ("Fours." ++ name) $ assertFoursTest ft
 
 
-tests = map testCaseFoursTest foursTests
+assertParseUsesLeftovers :: ParseTest -> Assertion
+assertParseUsesLeftovers (ok, _, input, output, mlo) = assert . fromJust $ do
+  let pmulti () = replicateM_ 2 $ PA.parseP four >>= P.respond
+  let sess = PA.runParseK Nothing $ P.fromListS input >-> pmulti
+  ((epe,mlo'), res) <- P.runWriterT . P.runProxy $ sess >-> P.toListD
+  let okMlo = mlo' == mlo
+      okErr = either (const $ not ok) (const $ ok) epe
+      okRes = res == output
+  return $ okMlo && okErr && okRes
+
+-- testCaseReuseLeftovers :: ParseTest -> Test
+testCaseReuseLeftovers ft@(_,name,_,_,_) =
+  testCase ("Reuse." ++ name) $ assertParseUsesLeftovers ft
+
+
+tests = (map testCaseFoursTest      foursTests)
+     ++ (map testCaseReuseLeftovers foursTests)
