@@ -21,7 +21,7 @@ four = do
 
 
 pfours :: (Monad m, P.Proxy p) => () -> P.Pipe (PA.AttoparsecP T.Text p) T.Text Char m r
-pfours () = forever $ P.respond =<< PA.parseP four
+pfours () = forever $ P.respond =<< PA.parseD four
 
 
 type ParseTest = (Bool, String, [T.Text], [Char], Maybe T.Text)
@@ -65,7 +65,7 @@ testCaseFoursTest ft@(_,name,_,_,_) =
 
 assertParseUsesLeftovers :: ParseTest -> Assertion
 assertParseUsesLeftovers (ok, _, input, output, mlo) = assert . fromJust $ do
-  let pmulti () = replicateM_ 2 $ PA.parseP four >>= P.respond
+  let pmulti () = replicateM_ 2 $ PA.parseD four >>= P.respond
   let sess = PA.runParseK Nothing $ P.fromListS input >-> pmulti
   ((epe,mlo'), res) <- P.runWriterT . P.runProxy $ sess >-> P.toListD
   let okMlo = mlo' == mlo

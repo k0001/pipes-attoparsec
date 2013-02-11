@@ -17,8 +17,8 @@ module Control.Proxy.Trans.Attoparsec
   , popLeftovers
   , takeLeftovers
   , takeInputD
-  , parsePC
-  , parseP
+  , parseC
+  , parseD
   ) where
 
 
@@ -150,17 +150,17 @@ takeInputD n ()
 
 
 -- | Consume and parse input from upstream until parsing succeeds or fails.
-parsePC
+parseC
   :: (Monad m, Proxy p, AttoparsecInput a)
   => Parser a r
   -> P.Consumer (AttoparsecP a p) a m r
-parsePC parser = ParseP . E.EitherP . S.StateP . P.runIdentityK $ go
+parseC parser = ParseP . E.EitherP . S.StateP . P.runIdentityK $ go
   where go s = parsingWith parser s $ P.request ()
 
 
 -- | Parse input flowing downstream until parsing succeeds or fails.
-parseP
+parseD
   :: (Monad m, AttoparsecInput a, Proxy p)
   => Parser a r
   -> P.Pipe (AttoparsecP a p) a b m r
-parseP parser = (const (parsePC parser) >-> P.unitU) ()
+parseD parser = (const (parseC parser) >-> P.unitU) ()
