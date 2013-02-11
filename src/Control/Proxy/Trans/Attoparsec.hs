@@ -20,6 +20,7 @@ module Control.Proxy.Trans.Attoparsec
   , takeLeftovers
   , takeInputWithLeftoversD
   , parsePC
+  , parseP
   ) where
 
 
@@ -29,6 +30,7 @@ import           Control.Monad                  (MonadPlus)
 import           Control.Monad.IO.Class         (MonadIO)
 import           Control.Monad.Trans.Class      (MonadTrans)
 import           Control.PFunctor               (PFunctor (..))
+import           Control.Proxy                  ((>->))
 import qualified Control.Proxy                  as P
 import           Control.Proxy.Attoparsec.Types
 import           Control.Proxy.Class            (MonadIOP, MonadPlusP, Proxy)
@@ -156,3 +158,10 @@ parsePC
 parsePC parser = ParseP . E.EitherP . S.StateP . P.runIdentityK $ go
   where go s = parsingWith parser s $ P.request ()
 
+
+-- | Parse input flowing downstream until parsing succeeds or fails.
+parseP
+  :: (Monad m, AttoparsecInput a, Proxy p)
+  => Parser a r
+  -> P.Pipe (AttoparsecP a p) a b m r
+parseP parser = (const (parsePC parser) >-> P.unitU) ()

@@ -19,11 +19,9 @@ four = do
    replicateM_ 3 $ char c
    return c
 
-fourPC :: (Monad m, P.Proxy p) => () -> P.Consumer (PA.AttoparsecP T.Text p) T.Text m Char
-fourPC () = PA.parsePC four
 
 pfours :: (Monad m, P.Proxy p) => () -> P.Pipe (PA.AttoparsecP T.Text p) T.Text Char m r
-pfours () = forever $ P.respond =<< (fourPC >-> P.unitU) ()
+pfours () = forever $ P.respond =<< PA.parseP four
 
 
 type FoursTest = (Bool, String, [T.Text], [Char], Maybe T.Text)
