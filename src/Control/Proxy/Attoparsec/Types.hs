@@ -25,6 +25,8 @@ import           Data.Attoparsec.Types
 import qualified Data.ByteString            as BS
 import qualified Data.Text                  as T
 import           Prelude                    hiding (null, splitAt)
+import           Data.Monoid                (Monoid)
+
 
 
 -- | Status of a parsing 'Proxy'.
@@ -80,7 +82,7 @@ data BadInput
 
 
 -- | A class for valid Attoparsec input types.
-class Eq a => AttoparsecInput a where
+class (Monoid a, Eq a) => AttoparsecInput a where
     -- | Run a 'Parser' with input @a@.
     parse :: Parser a b -> a -> IResult a b
     -- | Tests whether @a@ is empty.
@@ -142,9 +144,9 @@ parseWith refill p (Just s) = step $ parse p s
 
 
 -- | 'parseWith' with the order of arguments changed.
--- 
+--
 -- Useful to be used as:
--- 
+--
 -- > result <- parsingWith myParser initialInput $ do
 -- >   ... return more input ...
 parsingWith
