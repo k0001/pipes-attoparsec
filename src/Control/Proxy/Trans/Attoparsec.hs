@@ -41,18 +41,8 @@ import           Prelude                        hiding (length, null, splitAt)
 -- | An Either-State proxy transformer on which 'AttoparsecP' builds.
 newtype ParseP e s p a' a b' b m r
   = ParseP { unParseP :: E.EitherP e (S.StateP s p) a' a b' b m r }
-  deriving
-    ( Functor
-    , Applicative
-    , Monad
-    , MonadTrans
-    , MonadPlus
-    , MonadIO
-    , Proxy
-    , MonadPlusP
-    , MonadIOP
-    , MFunctor
-    )
+  deriving (Functor, Applicative, Monad, MonadTrans, MonadPlus,
+            MonadIO, MFunctor, Proxy, MonadPlusP, MonadIOP)
 
 instance ProxyTrans (ParseP e s) where
   liftP = ParseP . liftP . liftP
@@ -75,7 +65,6 @@ runParseP
   -> ParseP e s p a' a b' b m r
   -> p a' a b' b m (Either e r, s)
 runParseP s = S.runStateP s . E.runEitherP . unParseP
-
 
 get :: (Monad m, P.Proxy p) => ParseP e s p a' a b' b m s
 get = gets id
@@ -154,4 +143,6 @@ parseD
 parseD parser = (p >-> P.unitU) () where
   p () = ParseP . E.EitherP . S.StateP . P.runIdentityK $ \s ->
            parseWith (P.request ()) parser s
+
+
 
