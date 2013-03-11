@@ -16,12 +16,8 @@ module Control.Proxy.Trans.Attoparsec
   , getLeftovers
   , popLeftovers
   , takeLeftovers
-  , appendLeftovers
   , takeInputD
-  , parseC
-  , parseC'
   , parseD
-  , parseD'
   ) where
 
 
@@ -29,7 +25,7 @@ import           Control.Applicative            (Applicative (..), (<$>))
 import           Control.MFunctor               (MFunctor)
 import           Control.Monad                  (MonadPlus)
 import           Control.Monad.IO.Class         (MonadIO)
-import           Control.Monad.Trans.Class      (MonadTrans, lift)
+import           Control.Monad.Trans.Class      (MonadTrans)
 import           Control.PFunctor               (PFunctor (..))
 import           Control.Proxy                  ((>->))
 import qualified Control.Proxy                  as P
@@ -39,7 +35,6 @@ import           Control.Proxy.Trans            (ProxyTrans (..))
 import qualified Control.Proxy.Trans.Either     as E
 import qualified Control.Proxy.Trans.State      as S
 import           Data.Attoparsec.Types          (Parser)
-import           Data.Monoid                    ((<>))
 import           Prelude                        hiding (length, null, splitAt)
 
 
@@ -66,7 +61,6 @@ instance PFunctor (ParseP e s) where
   hoistP nat = wrap . (nat .) . unwrap
     where wrap   = ParseP . E.EitherP . S.StateP
           unwrap = S.unStateP . E.runEitherP . unParseP
-
 
 runParseK
   :: (Proxy p, Monad m)
@@ -114,7 +108,6 @@ takeInputD' = P.runIdentityK . go where
 -- | 'ParseP' specialized for Attoparsec integration.
 type AttoparsecP a = ParseP ParserError (Maybe a)
 
-
 -- | Get any leftovers from the 'AttoparsecP' state.
 getLeftovers
   :: (Monad m, P.Proxy p, AttoparsecInput a)
@@ -137,13 +130,6 @@ takeLeftovers n = do
     Nothing    -> return Nothing
     Just (p,s) -> put (mayInput s) >> return (mayInput p)
 
--- | Append more input to leftovers.
-appendLeftovers
-  :: (Monad m, P.Proxy p, AttoparsecInput a)
-  => a -> (AttoparsecP a p) a' a b' b m ()
-appendLeftovers a = put . Just . maybe a (<>a) =<< getLeftovers
-
-
 -- | Pipe input flowing downstream up to length @n@, prepending any leftovers.
 takeInputD
   :: (Monad m, Proxy p, AttoparsecInput a)
@@ -158,47 +144,14 @@ takeInputD n ()
   where
     fromUpstream n = takeInputD' n () >>= put
 
-
--- | Consume and parse input from upstream until parsing succeeds or fails.
+-- | Parses input flowing downstream until parsing succeeds or fails.
 --
--- This is an specialized version of 'parseC'' that requests `()` upstream.
-parseC
-  :: (Monad m, Proxy p, AttoparsecInput a)
-  => Parser a r
-  -> P.Consumer (AttoparsecP a p) a m r
-parseC = parseC' Nothing (return ())
-
-
--- | Parse input flowing downstream until parsing succeeds or fails.
---
--- This is an specialized version of 'parseD'' that requests `()` upstream.
+-- Requests `()` upstream when more input is needed.
 parseD
   :: (Monad m, AttoparsecInput a, Proxy p)
   => Parser a r
   -> P.Pipe (AttoparsecP a p) a b m r
-parseD = parseD' Nothing (return ())
-
-
--- | Consume and parse input from upstream until parsing succeeds or fails.
-parseC'
-  :: (Monad m, Proxy p, AttoparsecInput a)
-  => Maybe a     -- ^Initial input.
-  -> m a'        -- ^Computation to get a new request value.
-  -> Parser a r  -- ^Parser to run on input from upstream.
-  -> P.Client (AttoparsecP a p) a' a m r
-parseC' initial mreq parser = do
-    maybe (return ()) appendLeftovers initial
-    ParseP . E.EitherP . S.StateP . P.runIdentityK $ \mlo ->
-      parseWith (P.request =<< lift mreq) parser mlo
-
-
--- | Parse input flowing downstream until parsing succeeds or fails.
-parseD'
-  :: (Monad m, AttoparsecInput a, Proxy p)
-  => Maybe a     -- ^Initial input.
-  -> m a'        -- ^Computation to get a new request value.
-  -> Parser a r  -- ^Parser to run on input from upstream.
-  -> (AttoparsecP a p) a' a () b m r
-parseD' initial mreq parser = p >-> P.unitU $ ()
-  where p () = parseC' initial mreq parser
+parseD parser = (p >-> P.unitU) () where
+  p () = ParseP . E.EitherP . S.StateP . P.runIdentityK $ \s ->
+           parseWith (P.request ()) parser s
 
