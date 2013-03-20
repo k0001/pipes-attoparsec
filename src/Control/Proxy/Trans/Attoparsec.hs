@@ -1,7 +1,6 @@
+{-# OPTIONS_GHC -fno-warn-unused-do-bind -fno-warn-name-shadowing #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
-
-{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 
 module Control.Proxy.Trans.Attoparsec
   ( -- * ParseP proxy transformer
@@ -10,8 +9,7 @@ module Control.Proxy.Trans.Attoparsec
   , runParseK
     -- ** AttoparsecP proxy transformer
   , AttoparsecP
-  , takeLeftovers
-  , takeInputD
+  , passN
   , parseD
   ) where
 
@@ -50,19 +48,36 @@ instance (P.Proxy p, Monad m) => MonadState (ParseP e s p a' a b' b m) where
   get   = ParseP (S.StateP (\s -> E.right (s ,s)))
   put s = ParseP (S.StateP (\_ -> E.right ((),s)))
 
-runParseK :: s -> (t -> ParseP e s p a' a b' b m r)
+runParseK :: (Monad m, P.Proxy p)
+          => s -> (t -> ParseP e s p a' a b' b m r)
           -> (t -> p a' a b' b m (Either e (r, s)))
 runParseK s k q = runParseP s (k q)
 
-runParseP :: s -> ParseP e s p a' a b' b m r
+runParseP :: (Monad m, P.Proxy p)
+          => s -> ParseP e s p a' a b' b m r
           -> p a' a b' b m (Either e (r, s))
 runParseP s = E.runEitherP . S.runStateP s . unParseP
 
+-- | 'ParseP specialized for Attoparsec integration.
+type AttoparsecP a = ParseP ParserError (Maybe a)
+
+-- | Pipe input flowing downstream up to length @n@, prepending any leftovers.
+passN :: (Monad m, P.Proxy p, AttoparsecInput a)
+      => Int -> () -> P.Pipe (AttoparsecP a p) a a m ()
+passN n ()
+  | n <= 0    = return ()
+  | otherwise = do
+      mlo <- takeLeftovers n
+      case mlo of
+        Nothing -> fromUpstream n
+        Just lo -> P.respond lo >> fromUpstream (n - length lo)
+  where
+    fromUpstream n = passN' n () >>= put
+
 -- | Pipe input flowing downstream up to length @n@. Return any leftovers.
-takeInputD'
-  :: (Monad m, P.Proxy p, AttoparsecInput a)
-  => Int -> () -> P.Pipe p a a m (Maybe a)
-takeInputD' = P.runIdentityK . go where
+passN' :: (Monad m, P.Proxy p, AttoparsecInput a)
+       => Int -> () -> P.Pipe p a a m (Maybe a)
+passN' = P.runIdentityK . go where
   go n ()
     | n <= 0    = return Nothing
     | otherwise = do
@@ -72,43 +87,24 @@ takeInputD' = P.runIdentityK . go where
           then go (n - length p) ()
           else return (Just s)
 
--- | 'ParseP specialized for Attoparsec integration.
-type AttoparsecP a = ParseP ParserError (Maybe a)
-
 -- | Pop input up to length @n@ from leftovers, if any, and leave the rest.
-takeLeftovers
-  :: (Monad m, P.Proxy p, AttoparsecInput a)
-  => Int -> (AttoparsecP a p) a' a b' b m (Maybe a)
+takeLeftovers :: (Monad m, P.Proxy p, AttoparsecInput a)
+              => Int -> (AttoparsecP a p) a' a b' b m (Maybe a)
 takeLeftovers n = do
   lo <- get
   case fmap (splitAt n) lo of
     Nothing    -> return Nothing
     Just (p,s) -> put (mayInput s) >> return (mayInput p)
 
--- | Pipe input flowing downstream up to length @n@, prepending any leftovers.
-takeInputD
-  :: (Monad m, P.Proxy p, AttoparsecInput a)
-  => Int -> () -> P.Pipe (AttoparsecP a p) a a m ()
-takeInputD n ()
-  | n <= 0    = return ()
-  | otherwise = do
-      mlo <- takeLeftovers n
-      case mlo of
-        Nothing -> fromUpstream n
-        Just lo -> P.respond lo >> fromUpstream (n - length lo)
-  where
-    fromUpstream n = takeInputD' n () >>= put
-
 -- | Parses input flowing downstream until parsing succeeds or fails.
 --
 -- Requests `()` upstream when more input is needed.
-parseD
-  :: (Monad m, AttoparsecInput a, P.Proxy p)
-  => Parser a r
-  -> P.Pipe (AttoparsecP a p) a x m r
+parseD :: (Monad m, AttoparsecInput a, P.Proxy p)
+       => Parser a r -> P.Pipe (AttoparsecP a p) a x m r
 parseD parser = (p >-> P.unitU) () where
   p () = ParseP (S.StateP (\s -> do
            (er,s') <- parseWith (P.request ()) parser s
            case er of
              Left e  -> E.throw e
              Right r -> return (r,s') ))
+
