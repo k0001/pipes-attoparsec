@@ -10,8 +10,6 @@ module Control.Proxy.Trans.Attoparsec
   , runParseK
     -- ** AttoparsecP proxy transformer
   , AttoparsecP
-  , getLeftovers
-  , popLeftovers
   , takeLeftovers
   , takeInputD
   , parseD
@@ -76,18 +74,6 @@ takeInputD' = P.runIdentityK . go where
 
 -- | 'ParseP specialized for Attoparsec integration.
 type AttoparsecP a = ParseP ParserError (Maybe a)
-
--- | Get any leftovers from the 'AttoparsecP' state.
-getLeftovers
-  :: (Monad m, P.Proxy p, AttoparsecInput a)
-  => (AttoparsecP a p) a' a b' b m (Maybe a)
-getLeftovers = get
-
--- | Pop any leftovers from the 'AttoparsecP' state.
-popLeftovers
-  :: (Monad m, P.Proxy p, AttoparsecInput a)
-  => (AttoparsecP a p) a' a b' b m (Maybe a)
-popLeftovers = do { s <- get; put Nothing; return s }
 
 -- | Pop input up to length @n@ from leftovers, if any, and leave the rest.
 takeLeftovers
