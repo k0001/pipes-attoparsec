@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor  #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -- | This module exports common types used throughout
 -- @"Control.Proxy.Attoparsec".*@
@@ -19,6 +20,7 @@ module Control.Proxy.Attoparsec.Types
   , ParserError(..)
   ) where
 
+import           Control.Exception          (Exception)
 import qualified Data.Attoparsec.ByteString as ABS
 import qualified Data.Attoparsec.Text       as AT
 import           Data.Attoparsec.Types
@@ -26,6 +28,7 @@ import qualified Data.ByteString            as BS
 import qualified Data.Text                  as T
 import           Prelude                    hiding (null, splitAt)
 import           Data.Monoid                (Monoid)
+import           Data.Typeable              (Typeable)
 
 
 
@@ -52,8 +55,9 @@ data ParserStatus a
 data ParserError = ParserError
     { errorContexts :: [String]  -- ^ Contexts where the error occurred.
     , errorMessage  :: String    -- ^ Error message.
-    } deriving (Show, Eq)
+    } deriving (Show, Eq, Typeable)
 
+instance Exception ParserError where
 
 -- | Indicates how should a parsing 'Proxy' use new input.
 data SupplyUse
