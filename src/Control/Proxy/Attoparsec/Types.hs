@@ -103,20 +103,20 @@ class (Monoid a, Eq a) => AttoparsecInput a where
     length :: a -> Int
 
 instance AttoparsecInput BS.ByteString where
-    parse = ABS.parse
-    null = BS.null
+    parse   = ABS.parse
+    null    = BS.null
     splitAt = BS.splitAt
-    take = BS.take
-    drop = BS.drop
-    length = BS.length
+    take    = BS.take
+    drop    = BS.drop
+    length  = BS.length
 
 instance AttoparsecInput T.Text where
-    parse = AT.parse
-    null = T.null
+    parse   = AT.parse
+    null    = T.null
     splitAt = T.splitAt
-    take = T.take
-    drop = T.drop
-    length = T.length
+    take    = T.take
+    drop    = T.drop
+    length  = T.length
 
 -- | Wrap @a@ in 'Just' if not-null. Otherwise, 'Nothing'.
 mayInput :: AttoparsecInput a => a -> Maybe a
