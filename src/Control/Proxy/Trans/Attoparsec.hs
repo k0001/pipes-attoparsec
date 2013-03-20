@@ -1,16 +1,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
+{-# LANGUAGE TypeFamilies #-}
 
 module Control.Proxy.Trans.Attoparsec
   ( -- * ParseP proxy transformer
     ParseP(..)
   , runParseP
   , runParseK
-    -- ** StateP support
-  , get
-  , put
-  , modify
-  , gets
     -- ** AttoparsecP proxy transformer
   , AttoparsecP
   , getLeftovers
@@ -27,6 +22,7 @@ import           Control.MFunctor               (MFunctor)
 import           Control.Monad                  (MonadPlus)
 import           Control.Monad.IO.Class         (MonadIO)
 import           Control.Monad.Trans.Class      (MonadTrans)
+import           Control.Monad.State.Class      (MonadState(..))
 import           Control.PFunctor               (PFunctor (..))
 import           Control.Proxy                  ((>->))
 import qualified Control.Proxy                  as P
@@ -60,17 +56,10 @@ runParseP :: s
           -> p a' a b' b m (Either Ex.SomeException (r, s))
 runParseP s = E.runEitherP . S.runStateP s . unParseP
 
-get :: (Monad m, P.Proxy p) => ParseP s p a' a b' b m s
-get = gets id
-
-put :: (Monad m, P.Proxy p) => s -> ParseP s p a' a b' b m ()
-put s = ParseP . S.StateP $ \_ -> E.EitherP (P.return_P (Right ((),s)))
-
-modify :: (Monad m, P.Proxy p) => (s -> s) -> ParseP s p a' a b' b m ()
-modify f = ParseP . S.StateP $ \s -> E.EitherP (P.return_P (Right ((),f s)))
-
-gets :: (Monad m, P.Proxy p) => (s -> s') -> ParseP s p a' a b' b m s'
-gets f = ParseP . S.StateP $ \s -> E.EitherP (P.return_P (Right (f s,s)))
+instance (P.Proxy p, Monad m) => MonadState (ParseP s p a' a b' b m) where
+  type StateType (ParseP s p a' a b' b m) = s
+  get   = ParseP (S.StateP (\s -> E.right (s ,s)))
+  put s = ParseP (S.StateP (\_ -> E.right ((),s)))
 
 
 -- | Pipe input flowing downstream up to length @n@. Return any leftovers.
