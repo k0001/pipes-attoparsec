@@ -11,6 +11,7 @@ module Control.Proxy.Trans.Attoparsec
   , AttoparsecP
   , parseD
   , maybeParseD
+  , eitherParseD
     -- *** Utils
   , passN
   , skipN
@@ -91,6 +92,15 @@ maybeParseD :: (Monad m, AttoparsecInput a, P.Proxy p)
             => Parser a r -> P.Pipe (AttoparsecP a p) a x m (Maybe r)
 maybeParseD = parseD . optional
 {-# INLINABLE maybeParseD #-}
+
+-- | Try to parse input flowing downstream.
+--
+-- Requests `()` upstream when more input is needed.
+eitherParseD :: (Monad m, AttoparsecInput a, P.Proxy p)
+             => Parser a r -> P.Pipe (AttoparsecP a p) a x m (Either ParserError r)
+eitherParseD parser = (p >-> P.unitU) () where
+  p () = ParseP (S.StateP (\s -> parseWith (P.request ()) parser s))
+{-# INLINABLE eitherParseD #-}
 
 --------------------------------------------------------------------------------
 -- Exported utilities
