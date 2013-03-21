@@ -17,8 +17,7 @@ module Control.Proxy.Trans.Attoparsec
   , skipN
   ) where
 
-import           Control.Applicative            (Applicative(..), (<$>),
-                                                 optional)
+import           Control.Applicative            (Applicative(..), optional)
 import           Control.MFunctor               (MFunctor)
 import           Control.Monad                  (MonadPlus)
 import           Control.Monad.IO.Class         (MonadIO)
@@ -117,18 +116,31 @@ passN n
         Nothing -> fromUpstream n
         Just lo -> P.respond lo >> fromUpstream (n - length lo)
   where
-    fromUpstream n = passN' n () >>= put
+    fromUpstream n
+      | n <= 0    = return ()
+      | otherwise = reqInputN P.respond n >>= put
 {-# INLINABLE passN #-}
 
+-- | Drop input flowing downstream up to length @n@, including any leftovers.
 skipN :: (Monad m, AttoparsecInput a, P.Proxy p)
       => Int -> P.Pipe (AttoparsecP a p) a x m ()
-skipN n = parseD . sequence_ . replicate n $ satisfy (const True)
+skipN n
+  | n <= 0    = return ()
+  | otherwise = do
+      mlo <- takeLeftovers n
+      case mlo of
+        Nothing -> fromUpstream n
+        Just lo -> fromUpstream (n - length lo)
+  where
+    fromUpstream n
+      | n <= 0    = return ()
+      | otherwise = reqInputN (const (return ())) n >>= put
 {-# INLINABLE skipN #-}
 
 --------------------------------------------------------------------------------
 -- Internal utilities
 
--- | Pop input up to length @n@ from leftovers, if any, and leave the rest.
+-- | Pop input up to length @n@ from leftovers. Leave any leftovers.
 takeLeftovers :: (Monad m, P.Proxy p, AttoparsecInput a)
               => Int -> (AttoparsecP a p) a' a b' b m (Maybe a)
 takeLeftovers n = do
@@ -137,16 +149,17 @@ takeLeftovers n = do
     Nothing    -> return Nothing
     Just (p,s) -> put (mayInput s) >> return (mayInput p)
 
--- | Pipe input flowing downstream up to length @n@. Return any leftovers.
-passN' :: (Monad m, P.Proxy p, AttoparsecInput a)
-       => Int -> () -> P.Pipe p a a m (Maybe a)
-passN' = P.runIdentityK . go where
-  go n ()
-    | n <= 0    = return Nothing
+-- | Receive input from upstream up to length @n@ and apply the given action to
+-- each received chunk. Return any leftovers.
+reqInputN :: (Monad (p () a b' b m), Monad m, AttoparsecInput a, P.Proxy p)
+          => (a -> p () a b' b m r) -> Int -> p () a b' b m (Maybe a)
+reqInputN f = go where
+  go n
+    | n <= 0    = P.return_P Nothing
     | otherwise = do
-        (p,s) <- splitAt n <$> P.request ()
-        P.respond p
+        (p,s) <- P.request () >>= P.return_P . splitAt n
+        f p
         if null s
-          then go (n - length p) ()
+          then go (n - length p)
           else return (Just s)
 
