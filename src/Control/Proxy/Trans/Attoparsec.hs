@@ -9,11 +9,15 @@ module Control.Proxy.Trans.Attoparsec
   , runParseK
     -- ** AttoparsecP proxy transformer
   , AttoparsecP
-  , passN
   , parseD
+  , maybeParseD
+    -- *** Utils
+  , passN
+  , skipN
   ) where
 
-import           Control.Applicative            (Applicative(..), (<$>))
+import           Control.Applicative            (Applicative(..), (<$>),
+                                                 optional)
 import           Control.MFunctor               (MFunctor)
 import           Control.Monad                  (MonadPlus)
 import           Control.Monad.IO.Class         (MonadIO)
@@ -58,8 +62,38 @@ runParseP :: (Monad m, P.Proxy p)
           -> p a' a b' b m (Either e (r, s))
 runParseP s = E.runEitherP . S.runStateP s . unParseP
 
+--------------------------------------------------------------------------------
+-- Attoparsec interleaved parsing support
+
 -- | 'ParseP specialized for Attoparsec integration.
 type AttoparsecP a = ParseP ParserError (Maybe a)
+
+-- | Parses input flowing downstream until.
+--
+-- In case of parsing errors, a 'ParserError' exception is thrown in the
+-- 'E.EitherP' proxy transformer.
+--
+-- Requests `()` upstream when more input is needed.
+parseD :: (Monad m, AttoparsecInput a, P.Proxy p)
+       => Parser a r -> P.Pipe (AttoparsecP a p) a x m r
+parseD parser = (p >-> P.unitU) () where
+  p () = ParseP (S.StateP (\s -> do
+           (er,s') <- parseWith (P.request ()) parser s
+           case er of
+             Left e  -> E.throw e
+             Right r -> return (r,s') ))
+{-# INLINABLE parseD #-}
+
+-- | Try to parse input flowing downstream.
+--
+-- Requests `()` upstream when more input is needed.
+maybeParseD :: (Monad m, AttoparsecInput a, P.Proxy p)
+            => Parser a r -> P.Pipe (AttoparsecP a p) a x m (Maybe r)
+maybeParseD = parseD . optional
+{-# INLINABLE maybeParseD #-}
+
+--------------------------------------------------------------------------------
+-- Exported utilities
 
 -- | Pipe input flowing downstream up to length @n@, prepending any leftovers.
 passN :: (Monad m, P.Proxy p, AttoparsecInput a)
@@ -73,6 +107,24 @@ passN n ()
         Just lo -> P.respond lo >> fromUpstream (n - length lo)
   where
     fromUpstream n = passN' n () >>= put
+{-# INLINABLE passN #-}
+
+skipN :: (Monad m, AttoparsecInput a, P.Proxy p)
+      => Int -> P.Pipe (AttoparsecP a p) a x m ()
+skipN n = parseD . sequence_ . replicate n $ satisfy (const True)
+{-# INLINABLE skipN #-}
+
+--------------------------------------------------------------------------------
+-- Internal utilities
+
+-- | Pop input up to length @n@ from leftovers, if any, and leave the rest.
+takeLeftovers :: (Monad m, P.Proxy p, AttoparsecInput a)
+              => Int -> (AttoparsecP a p) a' a b' b m (Maybe a)
+takeLeftovers n = do
+  lo <- get
+  case fmap (splitAt n) lo of
+    Nothing    -> return Nothing
+    Just (p,s) -> put (mayInput s) >> return (mayInput p)
 
 -- | Pipe input flowing downstream up to length @n@. Return any leftovers.
 passN' :: (Monad m, P.Proxy p, AttoparsecInput a)
@@ -86,25 +138,4 @@ passN' = P.runIdentityK . go where
         if null s
           then go (n - length p) ()
           else return (Just s)
-
--- | Pop input up to length @n@ from leftovers, if any, and leave the rest.
-takeLeftovers :: (Monad m, P.Proxy p, AttoparsecInput a)
-              => Int -> (AttoparsecP a p) a' a b' b m (Maybe a)
-takeLeftovers n = do
-  lo <- get
-  case fmap (splitAt n) lo of
-    Nothing    -> return Nothing
-    Just (p,s) -> put (mayInput s) >> return (mayInput p)
-
--- | Parses input flowing downstream until parsing succeeds or fails.
---
--- Requests `()` upstream when more input is needed.
-parseD :: (Monad m, AttoparsecInput a, P.Proxy p)
-       => Parser a r -> P.Pipe (AttoparsecP a p) a x m r
-parseD parser = (p >-> P.unitU) () where
-  p () = ParseP (S.StateP (\s -> do
-           (er,s') <- parseWith (P.request ()) parser s
-           case er of
-             Left e  -> E.throw e
-             Right r -> return (r,s') ))
 

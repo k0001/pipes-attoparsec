@@ -21,6 +21,7 @@ module Control.Proxy.Attoparsec.Types
 
 import           Control.Exception          (Exception)
 import qualified Data.Attoparsec.ByteString as ABS
+import qualified Data.Attoparsec.ByteString.Char8 as AB8
 import qualified Data.Attoparsec.Text       as AT
 import           Data.Attoparsec.Types      (Parser, IResult(..))
 import qualified Data.ByteString            as BS
@@ -99,6 +100,8 @@ class (Monoid a, Eq a) => AttoparsecInput a where
     splitAt :: Int -> a -> (a,a)
     -- | Number of elements in @a@.
     length :: a -> Int
+    -- | 'satisfy' parser
+    satisfy :: (Char -> Bool) -> Parser a Char
 
 instance AttoparsecInput BS.ByteString where
     parse   = ABS.parse
@@ -107,6 +110,7 @@ instance AttoparsecInput BS.ByteString where
     take    = BS.take
     drop    = BS.drop
     length  = BS.length
+    satisfy = AB8.satisfy
 
 instance AttoparsecInput T.Text where
     parse   = AT.parse
@@ -115,6 +119,7 @@ instance AttoparsecInput T.Text where
     take    = T.take
     drop    = T.drop
     length  = T.length
+    satisfy = AT.satisfy
 
 -- | Wrap @a@ in 'Just' if not-null. Otherwise, 'Nothing'.
 mayInput :: AttoparsecInput a => a -> Maybe a
