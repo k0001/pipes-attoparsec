@@ -97,7 +97,8 @@ maybeParseD = parseD . optional
 --
 -- Requests `()` upstream when more input is needed.
 eitherParseD :: (Monad m, AttoparsecInput a, P.Proxy p)
-             => Parser a r -> P.Pipe (AttoparsecP a p) a x m (Either ParserError r)
+             => Parser a r
+             -> P.Pipe (AttoparsecP a p) a x m (Either ParserError r)
 eitherParseD parser = (p >-> P.unitU) () where
   p () = ParseP (S.StateP (\s -> parseWith (P.request ()) parser s))
 {-# INLINABLE eitherParseD #-}
