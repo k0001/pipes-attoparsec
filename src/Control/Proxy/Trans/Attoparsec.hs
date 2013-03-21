@@ -9,10 +9,8 @@ module Control.Proxy.Trans.Attoparsec
   , runParseK
     -- ** AttoparsecP proxy transformer
   , AttoparsecP
-  , parseD
   , passN
-    -- * Attoparsec support
-  , parseWith
+  , parseD
   ) where
 
 import           Control.Applicative            (Applicative(..), (<$>))
@@ -28,7 +26,7 @@ import           Control.Proxy.Attoparsec.Types
 import           Control.Proxy.Trans            (ProxyTrans (..))
 import qualified Control.Proxy.Trans.Either     as E
 import qualified Control.Proxy.Trans.State      as S
-import           Data.Attoparsec.Types          (Parser, IResult(..))
+import           Data.Attoparsec.Types          (Parser)
 import           Prelude                        hiding (length, null, splitAt)
 
 
@@ -62,18 +60,6 @@ runParseP s = E.runEitherP . S.runStateP s . unParseP
 
 -- | 'ParseP specialized for Attoparsec integration.
 type AttoparsecP a = ParseP ParserError (Maybe a)
-
--- | Parses input flowing downstream until parsing succeeds or fails.
---
--- Requests `()` upstream when more input is needed.
-parseD :: (Monad m, AttoparsecInput a, P.Proxy p)
-       => Parser a r -> P.Pipe (AttoparsecP a p) a x m r
-parseD parser = (p >-> P.unitU) () where
-  p () = ParseP (S.StateP (\s -> do
-           (er,s') <- parseWith (P.request ()) parser s
-           case er of
-             Left e  -> E.throw e
-             Right r -> return (r,s') ))
 
 -- | Pipe input flowing downstream up to length @n@, prepending any leftovers.
 passN :: (Monad m, P.Proxy p, AttoparsecInput a)
@@ -110,23 +96,15 @@ takeLeftovers n = do
     Nothing    -> return Nothing
     Just (p,s) -> put (mayInput s) >> return (mayInput p)
 
--- | Run a parser with an initial input string, and a monadic action
--- that can supply more input if needed.
-parseWith
-  :: (Monad m, AttoparsecInput a)
-  => m a
-  -- ^ An action that will be executed to provide the parser with more input,
-  -- if necessary. If the action returns an 'empty', then it's assumed no more
-  -- input is available.
-  -> Parser a b
-  -> Maybe a
-  -- ^ Optional initial input for the parser.
-  -> m (Either ParserError b, Maybe a)
-  -- ^ Either a parser error or a parsed result, together with any leftover.
-parseWith refill p Nothing  = parseWith refill p . Just =<< refill
-parseWith refill p (Just s) = step $ parse p s
-  where
-    step (Partial k)  = step . k =<< refill
-    step (Done t r)   = return (Right r, mayInput t)
-    step (Fail t c m) = return (Left (ParserError c m), mayInput t)
+-- | Parses input flowing downstream until parsing succeeds or fails.
+--
+-- Requests `()` upstream when more input is needed.
+parseD :: (Monad m, AttoparsecInput a, P.Proxy p)
+       => Parser a r -> P.Pipe (AttoparsecP a p) a x m r
+parseD parser = (p >-> P.unitU) () where
+  p () = ParseP (S.StateP (\s -> do
+           (er,s') <- parseWith (P.request ()) parser s
+           case er of
+             Left e  -> E.throw e
+             Right r -> return (r,s') ))
 

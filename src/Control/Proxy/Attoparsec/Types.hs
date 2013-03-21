@@ -15,6 +15,8 @@ module Control.Proxy.Attoparsec.Types
     -- * Attoparsec integration
   , AttoparsecInput(..)
   , mayInput
+  , parseWith
+  , parsingWith
   , ParserError(..)
   ) where
 
@@ -120,4 +122,40 @@ instance AttoparsecInput T.Text where
 mayInput :: AttoparsecInput a => a -> Maybe a
 mayInput x | null x    = Nothing
            | otherwise = Just x
+
+
+--- TODO: find a better home for these functions.
+
+-- | Run a parser with an initial input string, and a monadic action
+-- that can supply more input if needed.
+parseWith
+  :: (Monad m, AttoparsecInput a)
+  => m a
+  -- ^ An action that will be executed to provide the parser with more input,
+  -- if necessary. If the action returns an 'empty', then it's assumed no more
+  -- input is available.
+  -> Parser a b
+  -> Maybe a
+  -- ^ Optional initial input for the parser.
+  -> m (Either ParserError b, Maybe a)
+  -- ^ Either a parser error or a parsed result, together with any leftover.
+parseWith refill p Nothing  = parseWith refill p . Just =<< refill
+parseWith refill p (Just s) = step $ parse p s
+  where
+    step (Partial k)  = step . k =<< refill
+    step (Done t r)   = return (Right r, mayInput t)
+    step (Fail t c m) = return (Left (ParserError c m), mayInput t)
+
+
+-- | 'parseWith' with the order of arguments changed.
+--
+-- Useful to be used as:
+--
+-- > result <- parsingWith myParser initialInput $ do
+-- >   ... return more input ...
+parsingWith
+  :: (Monad m, AttoparsecInput a)
+  => Parser a b -> Maybe a -> m a
+  -> m (Either ParserError b, Maybe a)
+parsingWith p ms refill = parseWith refill p ms
 
