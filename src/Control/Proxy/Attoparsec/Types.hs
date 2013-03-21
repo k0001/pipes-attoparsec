@@ -16,20 +16,18 @@ module Control.Proxy.Attoparsec.Types
   , AttoparsecInput(..)
   , mayInput
   , parseWith
-  , parsingWith
   , ParserError(..)
   ) where
 
 import           Control.Exception          (Exception)
 import qualified Data.Attoparsec.ByteString as ABS
 import qualified Data.Attoparsec.Text       as AT
-import           Data.Attoparsec.Types
+import           Data.Attoparsec.Types      (Parser, IResult(..))
 import qualified Data.ByteString            as BS
 import qualified Data.Text                  as T
 import           Prelude                    hiding (null, splitAt)
 import           Data.Monoid                (Monoid)
 import           Data.Typeable              (Typeable)
-
 
 
 -- | Status of a parsing 'Proxy'.
@@ -124,8 +122,6 @@ mayInput x | null x    = Nothing
            | otherwise = Just x
 
 
---- TODO: find a better home for these functions.
-
 -- | Run a parser with an initial input string, and a monadic action
 -- that can supply more input if needed.
 parseWith
@@ -145,17 +141,4 @@ parseWith refill p (Just s) = step $ parse p s
     step (Partial k)  = step . k =<< refill
     step (Done t r)   = return (Right r, mayInput t)
     step (Fail t c m) = return (Left (ParserError c m), mayInput t)
-
-
--- | 'parseWith' with the order of arguments changed.
---
--- Useful to be used as:
---
--- > result <- parsingWith myParser initialInput $ do
--- >   ... return more input ...
-parsingWith
-  :: (Monad m, AttoparsecInput a)
-  => Parser a b -> Maybe a -> m a
-  -> m (Either ParserError b, Maybe a)
-parsingWith p ms refill = parseWith refill p ms
 
