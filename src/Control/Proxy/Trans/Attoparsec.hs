@@ -108,8 +108,8 @@ eitherParseD parser = (p >-> P.unitU) () where
 
 -- | Pipe input flowing downstream up to length @n@, prepending any leftovers.
 passN :: (Monad m, P.Proxy p, AttoparsecInput a)
-      => Int -> () -> P.Pipe (AttoparsecP a p) a a m ()
-passN n ()
+      => Int -> P.Pipe (AttoparsecP a p) a a m ()
+passN n
   | n <= 0    = return ()
   | otherwise = do
       mlo <- takeLeftovers n
