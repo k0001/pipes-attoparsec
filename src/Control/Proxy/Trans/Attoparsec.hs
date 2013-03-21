@@ -75,7 +75,7 @@ type AttoparsecP a = ParseP ParserError (Maybe a)
 --
 -- Requests `()` upstream when more input is needed.
 parseD :: (Monad m, AttoparsecInput a, P.Proxy p)
-       => Parser a r -> P.Pipe (AttoparsecP a p) a x m r
+       => Parser a r -> P.Pipe (AttoparsecP a p) a b m r
 parseD parser = (p >-> P.unitU) () where
   p () = ParseP (S.StateP (\s -> do
            (er,s') <- parseWith (P.request ()) parser s
@@ -88,7 +88,7 @@ parseD parser = (p >-> P.unitU) () where
 --
 -- Requests `()` upstream when more input is needed.
 maybeParseD :: (Monad m, AttoparsecInput a, P.Proxy p)
-            => Parser a r -> P.Pipe (AttoparsecP a p) a x m (Maybe r)
+            => Parser a r -> P.Pipe (AttoparsecP a p) a b m (Maybe r)
 maybeParseD = parseD . optional
 {-# INLINABLE maybeParseD #-}
 
@@ -97,7 +97,7 @@ maybeParseD = parseD . optional
 -- Requests `()` upstream when more input is needed.
 eitherParseD :: (Monad m, AttoparsecInput a, P.Proxy p)
              => Parser a r
-             -> P.Pipe (AttoparsecP a p) a x m (Either ParserError r)
+             -> P.Pipe (AttoparsecP a p) a b m (Either ParserError r)
 eitherParseD parser = (p >-> P.unitU) () where
   p () = ParseP (S.StateP (\s -> parseWith (P.request ()) parser s))
 {-# INLINABLE eitherParseD #-}
@@ -108,39 +108,19 @@ eitherParseD parser = (p >-> P.unitU) () where
 -- | Pipe input flowing downstream up to length @n@, prepending any leftovers.
 passN :: (Monad m, P.Proxy p, AttoparsecInput a)
       => Int -> P.Pipe (AttoparsecP a p) a a m ()
-passN n
-  | n <= 0    = return ()
-  | otherwise = do
-      mlo <- takeLeftovers n
-      case mlo of
-        Nothing -> fromUpstream n
-        Just lo -> P.respond lo >> fromUpstream (n - length lo)
-  where
-    fromUpstream n
-      | n <= 0    = return ()
-      | otherwise = reqInputN P.respond n >>= put
+passN = nextInputN P.respond
 {-# INLINABLE passN #-}
 
 -- | Drop input flowing downstream up to length @n@, including any leftovers.
 skipN :: (Monad m, AttoparsecInput a, P.Proxy p)
-      => Int -> P.Pipe (AttoparsecP a p) a x m ()
-skipN n
-  | n <= 0    = return ()
-  | otherwise = do
-      mlo <- takeLeftovers n
-      case mlo of
-        Nothing -> fromUpstream n
-        Just lo -> fromUpstream (n - length lo)
-  where
-    fromUpstream n
-      | n <= 0    = return ()
-      | otherwise = reqInputN (const (return ())) n >>= put
+      => Int -> P.Pipe (AttoparsecP a p) a b m ()
+skipN = nextInputN (const (return ()))
 {-# INLINABLE skipN #-}
 
 --------------------------------------------------------------------------------
 -- Internal utilities
 
--- | Pop input up to length @n@ from leftovers. Leave any leftovers.
+-- | Pop input up to length @n@ from leftovers. Save any leftovers.
 takeLeftovers :: (Monad m, P.Proxy p, AttoparsecInput a)
               => Int -> (AttoparsecP a p) a' a b' b m (Maybe a)
 takeLeftovers n = do
@@ -148,6 +128,7 @@ takeLeftovers n = do
   case fmap (splitAt n) lo of
     Nothing    -> return Nothing
     Just (p,s) -> put (mayInput s) >> return (mayInput p)
+{-# INLINABLE takeLeftovers #-}
 
 -- | Receive input from upstream up to length @n@ and apply the given action to
 -- each received chunk. Return any leftovers.
@@ -162,4 +143,22 @@ reqInputN f = go where
         if null s
           then go (n - length p)
           else return (Just s)
+{-# INLINABLE reqInputN #-}
 
+-- | Receive input from upstream up to length @n@ and apply the given action to
+-- each received chunk, prepending any previous leftovers. Save any leftovers.
+nextInputN :: (Monad m, AttoparsecInput a, P.Proxy p)
+           => (a -> (AttoparsecP a p) () a b' b m r)
+           -> Int -> (AttoparsecP a p) () a b' b m ()
+nextInputN f n
+  | n <= 0    = return ()
+  | otherwise = do
+      mlo <- takeLeftovers n
+      case mlo of
+        Nothing -> fromUpstream n
+        Just lo -> f lo >> fromUpstream (n - length lo)
+  where
+    fromUpstream n
+      | n <= 0    = return ()
+      | otherwise = reqInputN f n >>= put
+{-# INLINABLE nextInputN #-}
