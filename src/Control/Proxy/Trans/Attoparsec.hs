@@ -5,8 +5,11 @@
 module Control.Proxy.Trans.Attoparsec
   ( -- * ParseP proxy transformer
     ParseP(..)
+  , unParseK
   , runParseP
   , runParseK
+  , tryRunParseP
+  , tryRunParseK
     -- ** AttoparsecP proxy transformer
   , AttoparsecP
   , parseD
@@ -38,6 +41,10 @@ newtype ParseP s p a' a b' b m r
   deriving (Functor, Applicative, Monad, MonadTrans, MonadIO, MFunctor,
             P.Proxy, P.ProxyInternal)
 
+unParseK :: (t -> ParseP s p a' a b' b m r)
+         -> t -> S.StateP s (E.EitherP SomeException p) a' a b' b m r
+unParseK = (unParseP .)
+
 instance ProxyTrans (ParseP s) where
   liftP = ParseP . liftP . liftP
 
@@ -51,15 +58,27 @@ instance (P.Proxy p, Monad m) => MonadState (ParseP s p a' a b' b m) where
   get   = ParseP (S.StateP (\s -> E.right (s ,s)))
   put s = ParseP (S.StateP (\_ -> E.right ((),s)))
 
-runParseK :: (Monad m, P.Proxy p)
-          => s -> (t -> ParseP s p a' a b' b m r)
+runParseP :: s -> ParseP s p a' a b' b m r
+          -> p a' a b' b m (Either SomeException (r, s))
+runParseP s = E.runEitherP . S.runStateP s . unParseP
+
+runParseK :: s -> (t -> ParseP s p a' a b' b m r)
           -> (t -> p a' a b' b m (Either SomeException (r, s)))
 runParseK s k q = runParseP s (k q)
 
-runParseP :: (Monad m, P.Proxy p)
-          => s -> ParseP s p a' a b' b m r
-          -> p a' a b' b m (Either SomeException (r, s))
-runParseP s = E.runEitherP . S.runStateP s . unParseP
+-- | Like 'runParseP', but only only unrolls the given 'ParseP' up to an
+-- 'E.EitherP SomeException' proxy transformer compatible with @ExceptionP@
+-- from @pipes-safe@.
+tryRunParseP :: s -> ParseP s p a' a b' b m r
+             -> E.EitherP SomeException p a' a b' b m (r, s)
+tryRunParseP s = S.runStateP s . unParseP
+
+-- | Like 'runParseK', but only only unrolls the given 'ParseP' up to an
+-- 'E.EitherP SomeException' proxy transformer compatible with @ExceptionP@
+-- from @pipes-safe@.
+tryRunParseK :: s -> (t -> ParseP s p a' a b' b m r)
+             -> (t -> E.EitherP SomeException p a' a b' b m (r, s))
+tryRunParseK s k q = tryRunParseP s (k q)
 
 --------------------------------------------------------------------------------
 -- Attoparsec interleaved parsing support
