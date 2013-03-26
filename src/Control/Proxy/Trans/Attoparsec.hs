@@ -76,9 +76,11 @@ tryRunParseK s k q = tryRunParseP s (k q)
 
 get :: (P.Proxy p, Monad m) => ParseP s p a' a b' b m s
 get = ParseP (S.StateP (\s -> E.right (s ,s)))
+{-# INLINABLE get #-}
 
 put :: (P.Proxy p, Monad m) => s -> ParseP s p a' a b' b m ()
 put s = ParseP (S.StateP (\_ -> E.right ((),s)))
+{-# INLINABLE put #-}
 
 --------------------------------------------------------------------------------
 -- Attoparsec interleaved parsing support
