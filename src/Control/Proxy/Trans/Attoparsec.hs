@@ -18,12 +18,11 @@ module Control.Proxy.Trans.Attoparsec
   ) where
 
 import           Control.Applicative            (Applicative(..), optional)
-import           Control.MFunctor               (MFunctor)
+import           Control.Monad.Morph            (MFunctor)
 import           Control.Monad                  (MonadPlus)
 import           Control.Monad.IO.Class         (MonadIO)
 import           Control.Monad.Trans.Class      (MonadTrans)
 import           Control.Monad.State.Class      (MonadState(..))
-import           Control.PFunctor               (PFunctor (..))
 import           Control.Proxy                  ((>->))
 import qualified Control.Proxy                  as P
 import           Control.Proxy.Attoparsec.Types
@@ -37,12 +36,12 @@ import           Prelude                        hiding (length, null, splitAt)
 newtype ParseP e s p a' a b' b m r
   = ParseP { unParseP :: S.StateP s (E.EitherP e p) a' a b' b m r }
   deriving (Functor, Applicative, Monad, MonadTrans, MonadPlus,
-            MonadIO, MFunctor, P.Proxy, P.MonadPlusP, P.MonadIOP)
+            MonadIO, MFunctor, P.Proxy, P.MonadPlusP, P.ProxyInternal)
 
 instance ProxyTrans (ParseP e s) where
   liftP = ParseP . liftP . liftP
 
-instance PFunctor (ParseP e s) where
+instance P.PFunctor (ParseP e s) where
   hoistP nat = wrap . (nat .) . unwrap
     where wrap   = ParseP . S.StateP . (E.EitherP .)
           unwrap = (E.runEitherP .) . S.unStateP . unParseP

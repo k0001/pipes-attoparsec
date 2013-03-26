@@ -38,7 +38,8 @@ library
                    Control.Proxy.Trans.Attoparsec
   build-depends:
     base (==4.*),
-    pipes (>=3.0),
+    mmorph (>=1.0),
+    pipes (>=3.2.0),
     attoparsec (>=0.10),
     bytestring,
     text,
@@ -59,7 +60,8 @@ test-suite tests
 
   build-depends:
     base (== 4.*),
-    pipes (>= 3.0),
+    mmorph (>= 1.0),
+    pipes (>= 3.2.0),
     attoparsec (>= 0.10),
     text,
     pipes-attoparsec,
