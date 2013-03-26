@@ -18,8 +18,8 @@ module Control.Proxy.Trans.Attoparsec
   ) where
 
 import           Control.Applicative            (Applicative(..), optional)
+import           Control.Exception              (SomeException, toException)
 import           Control.Monad.Morph            (MFunctor)
-import           Control.Monad                  (MonadPlus)
 import           Control.Monad.IO.Class         (MonadIO)
 import           Control.Monad.Trans.Class      (MonadTrans)
 import           Control.Monad.State.Class      (MonadState(..))
@@ -33,39 +33,39 @@ import           Data.Attoparsec.Types          (Parser)
 import           Prelude                        hiding (length, null, splitAt)
 
 
-newtype ParseP e s p a' a b' b m r
-  = ParseP { unParseP :: S.StateP s (E.EitherP e p) a' a b' b m r }
-  deriving (Functor, Applicative, Monad, MonadTrans, MonadPlus,
-            MonadIO, MFunctor, P.Proxy, P.MonadPlusP, P.ProxyInternal)
+newtype ParseP s p a' a b' b m r
+  = ParseP { unParseP :: S.StateP s (E.EitherP SomeException p) a' a b' b m r }
+  deriving (Functor, Applicative, Monad, MonadTrans, MonadIO, MFunctor,
+            P.Proxy, P.ProxyInternal)
 
-instance ProxyTrans (ParseP e s) where
+instance ProxyTrans (ParseP s) where
   liftP = ParseP . liftP . liftP
 
-instance P.PFunctor (ParseP e s) where
+instance P.PFunctor (ParseP s) where
   hoistP nat = wrap . (nat .) . unwrap
     where wrap   = ParseP . S.StateP . (E.EitherP .)
           unwrap = (E.runEitherP .) . S.unStateP . unParseP
 
-instance (P.Proxy p, Monad m) => MonadState (ParseP e s p a' a b' b m) where
-  type StateType (ParseP e s p a' a b' b m) = s
+instance (P.Proxy p, Monad m) => MonadState (ParseP s p a' a b' b m) where
+  type StateType (ParseP s p a' a b' b m) = s
   get   = ParseP (S.StateP (\s -> E.right (s ,s)))
   put s = ParseP (S.StateP (\_ -> E.right ((),s)))
 
 runParseK :: (Monad m, P.Proxy p)
-          => s -> (t -> ParseP e s p a' a b' b m r)
-          -> (t -> p a' a b' b m (Either e (r, s)))
+          => s -> (t -> ParseP s p a' a b' b m r)
+          -> (t -> p a' a b' b m (Either SomeException (r, s)))
 runParseK s k q = runParseP s (k q)
 
 runParseP :: (Monad m, P.Proxy p)
-          => s -> ParseP e s p a' a b' b m r
-          -> p a' a b' b m (Either e (r, s))
+          => s -> ParseP s p a' a b' b m r
+          -> p a' a b' b m (Either SomeException (r, s))
 runParseP s = E.runEitherP . S.runStateP s . unParseP
 
 --------------------------------------------------------------------------------
 -- Attoparsec interleaved parsing support
 
 -- | 'ParseP specialized for Attoparsec integration.
-type AttoparsecP a = ParseP ParserError (Maybe a)
+type AttoparsecP a = ParseP (Maybe a)
 
 -- | Parses input flowing downstream until.
 --
@@ -79,7 +79,7 @@ parseD parser = (p >-> P.unitU) () where
   p () = ParseP (S.StateP (\s -> do
            (er,s') <- parseWith (P.request ()) parser s
            case er of
-             Left e  -> E.throw e
+             Left e  -> E.throw (toException e)
              Right r -> return (r,s') ))
 {-# INLINABLE parseD #-}
 
