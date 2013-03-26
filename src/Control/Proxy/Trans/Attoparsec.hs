@@ -1,6 +1,4 @@
-{-# OPTIONS_GHC -fno-warn-unused-do-bind -fno-warn-name-shadowing #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TypeFamilies #-}
 
 module Control.Proxy.Trans.Attoparsec
   ( -- * ParseP proxy transformer
@@ -159,7 +157,7 @@ reqInputN f = go where
     | n <= 0    = P.return_P Nothing
     | otherwise = do
         (p,s) <- P.request () >>= P.return_P . splitAt n
-        f p
+        _ <- f p
         if null s
           then go (n - length p)
           else return (Just s)
@@ -178,7 +176,7 @@ nextInputN f n
         Nothing -> fromUpstream n
         Just lo -> f lo >> fromUpstream (n - length lo)
   where
-    fromUpstream n
-      | n <= 0    = return ()
-      | otherwise = reqInputN f n >>= put
+    fromUpstream len
+      | len <= 0    = return ()
+      | otherwise = reqInputN f len >>= put
 {-# INLINABLE nextInputN #-}
