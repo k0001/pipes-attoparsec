@@ -33,52 +33,55 @@ import           Data.Attoparsec.Types          (Parser)
 import           Prelude                        hiding (length, null, splitAt)
 
 
-newtype ParseP s p a' a b' b m r
-  = ParseP { unParseP :: S.StateP s (E.EitherP SomeException p) a' a b' b m r }
-  deriving (Functor, Applicative, Monad, MonadTrans, MonadIO, MFunctor,
+newtype ParseP i p a' a b' b m r
+  = ParseP {
+    unParseP :: S.StateP [Maybe i] (E.EitherP SomeException p) a' a b' b m r
+    -- ^pipes-parse will use the type `[Maybe i]` for the leftover states,
+    -- so here we embrace that type till then.
+  } deriving (Functor, Applicative, Monad, MonadTrans, MonadIO, MFunctor,
             P.Proxy, P.ProxyInternal)
 
-unParseK :: (t -> ParseP s p a' a b' b m r)
-         -> t -> S.StateP s (E.EitherP SomeException p) a' a b' b m r
+unParseK :: (t -> ParseP i p a' a b' b m r)
+         -> t -> S.StateP [Maybe i] (E.EitherP SomeException p) a' a b' b m r
 unParseK = (unParseP .)
 
-instance ProxyTrans (ParseP s) where
+instance ProxyTrans (ParseP i) where
   liftP = ParseP . liftP . liftP
 
-instance P.PFunctor (ParseP s) where
+instance P.PFunctor (ParseP i) where
   hoistP nat = wrap . (nat .) . unwrap
     where wrap   = ParseP . S.StateP . (E.EitherP .)
           unwrap = (E.runEitherP .) . S.unStateP . unParseP
 
-runParseP :: s -> ParseP s p a' a b' b m r
-          -> p a' a b' b m (Either SomeException (r, s))
+runParseP :: [Maybe i] -> ParseP i p a' a b' b m r
+          -> p a' a b' b m (Either SomeException (r, [Maybe i]))
 runParseP s = E.runEitherP . S.runStateP s . unParseP
 
-runParseK :: s -> (t -> ParseP s p a' a b' b m r)
-          -> (t -> p a' a b' b m (Either SomeException (r, s)))
+runParseK :: [Maybe i] -> (t -> ParseP i p a' a b' b m r)
+          -> (t -> p a' a b' b m (Either SomeException (r, [Maybe i])))
 runParseK s k q = runParseP s (k q)
 
 -- | Like 'runParseP', but only only unrolls the given 'ParseP' up to an
 -- 'E.EitherP SomeException' proxy transformer compatible with @ExceptionP@
 -- from @pipes-safe@.
-tryRunParseP :: s -> ParseP s p a' a b' b m r
-             -> E.EitherP SomeException p a' a b' b m (r, s)
+tryRunParseP :: [Maybe i] -> ParseP i p a' a b' b m r
+             -> E.EitherP SomeException p a' a b' b m (r, [Maybe i])
 tryRunParseP s = S.runStateP s . unParseP
 
 -- | Like 'runParseK', but only only unrolls the given 'ParseP' up to an
 -- 'E.EitherP SomeException' proxy transformer compatible with @ExceptionP@
 -- from @pipes-safe@.
-tryRunParseK :: s -> (t -> ParseP s p a' a b' b m r)
-             -> (t -> E.EitherP SomeException p a' a b' b m (r, s))
+tryRunParseK :: [Maybe i] -> (t -> ParseP i p a' a b' b m r)
+             -> (t -> E.EitherP SomeException p a' a b' b m (r, [Maybe i]))
 tryRunParseK s k q = tryRunParseP s (k q)
 
 --------------------------------------------------------------------------------
 
-get :: (P.Proxy p, Monad m) => ParseP s p a' a b' b m s
+get :: (P.Proxy p, Monad m) => ParseP i p a' a b' b m [Maybe i]
 get = ParseP (S.StateP (\s -> E.right (s ,s)))
 {-# INLINABLE get #-}
 
-put :: (P.Proxy p, Monad m) => s -> ParseP s p a' a b' b m ()
+put :: (P.Proxy p, Monad m) => [Maybe i] -> ParseP i p a' a b' b m ()
 put s = ParseP (S.StateP (\_ -> E.right ((),s)))
 {-# INLINABLE put #-}
 
@@ -86,7 +89,7 @@ put s = ParseP (S.StateP (\_ -> E.right ((),s)))
 -- Attoparsec interleaved parsing support
 
 -- | 'ParseP specialized for Attoparsec integration.
-type AttoparsecP a = ParseP (Maybe a)
+type AttoparsecP a = ParseP a
 
 -- | Parses input flowing downstream until.
 --
@@ -97,11 +100,12 @@ type AttoparsecP a = ParseP (Maybe a)
 parseD :: (Monad m, AttoparsecInput a, P.Proxy p)
        => Parser a r -> P.Pipe (AttoparsecP a p) a b m r
 parseD parser = (p >-> P.unitU) () where
-  p () = ParseP (S.StateP (\s -> do
+  p () = ParseP (S.StateP (\[s] -> do -- FIXME this is wrong, rely on `draw*`
+                                      -- from pipes-parse instead
            (er,s') <- parseWith (P.request ()) parser s
            case er of
              Left e  -> E.throw (toException e)
-             Right r -> return (r,s') ))
+             Right r -> return (r,[s']) ))
 {-# INLINABLE parseD #-}
 
 -- | Try to parse input flowing downstream.
@@ -119,7 +123,9 @@ eitherParseD :: (Monad m, AttoparsecInput a, P.Proxy p)
              => Parser a r
              -> P.Pipe (AttoparsecP a p) a b m (Either ParserError r)
 eitherParseD parser = (p >-> P.unitU) () where
-  p () = ParseP (S.StateP (\s -> parseWith (P.request ()) parser s))
+  p () = ParseP (S.StateP (\[s] -> -- FIXME this is wrong, rely on `draw*` from
+                                   -- pipes-parse instead
+         fmap (:[]) `fmap` parseWith (P.request ()) parser s))
 {-# INLINABLE eitherParseD #-}
 
 --------------------------------------------------------------------------------
@@ -144,10 +150,10 @@ skipN = nextInputN (const (return ()))
 takeLeftovers :: (Monad m, P.Proxy p, AttoparsecInput a)
               => Int -> (AttoparsecP a p) a' a b' b m (Maybe a)
 takeLeftovers n = do
-  lo <- get
+  [lo] <- get -- TODO: use following elements of the list if needed.
   case fmap (splitAt n) lo of
     Nothing    -> return Nothing
-    Just (p,s) -> put (mayInput s) >> return (mayInput p)
+    Just (p,s) -> put [mayInput s] >> return (mayInput p)
 {-# INLINABLE takeLeftovers #-}
 
 -- | Receive input from upstream up to length @n@ and apply the given action to
@@ -180,5 +186,5 @@ nextInputN f n
   where
     fromUpstream len
       | len <= 0    = return ()
-      | otherwise = reqInputN f len >>= put
+      | otherwise = reqInputN f len >>= put . (:[])
 {-# INLINABLE nextInputN #-}
