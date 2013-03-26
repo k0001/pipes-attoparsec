@@ -43,8 +43,7 @@ library
     attoparsec (>=0.10),
     bytestring,
     text,
-    transformers (>=0.2 && <=0.4),
-    monads-tf (==0.1.*)
+    transformers (>=0.2 && <=0.4)
 
   ghc-options:
     -Wall -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-name-shadowing
