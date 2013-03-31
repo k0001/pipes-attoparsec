@@ -1,95 +1,50 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Control.Proxy.Trans.Attoparsec
-  ( -- * ParseP proxy transformer
-    ParseP(..)
-  , unParseK
-  , runParseP
-  , runParseK
-  , tryRunParseP
-  , tryRunParseK
-    -- ** AttoparsecP proxy transformer
-  , AttoparsecP
+  (-- * AttoparsecP proxy transformer
+    AttoparsecP
+  , runAttoparsecP
+  , runAttoparsecK
   , parseD
   , maybeParseD
   , eitherParseD
-    -- *** Utils
+    -- ** Utils
   , passN
   , skipN
   ) where
 
-import           Control.Applicative            (Applicative(..), optional)
+import           Control.Applicative            (optional, (<$>))
 import           Control.Exception              (SomeException, toException)
-import           Control.Monad.Morph            (MFunctor)
-import           Control.Monad.IO.Class         (MonadIO)
-import           Control.Monad.Trans.Class      (MonadTrans)
+import           Control.Monad
 import           Control.Proxy                  ((>->))
 import qualified Control.Proxy                  as P
+import           Control.Proxy.Parse            (runParseP, drawMay, unDraw)
+import           Control.Proxy.Parse.Internal   (ParseP(ParseP))
 import           Control.Proxy.Attoparsec.Types
-import           Control.Proxy.Trans            (ProxyTrans (..))
 import qualified Control.Proxy.Trans.Either     as E
 import qualified Control.Proxy.Trans.State      as S
 import           Data.Attoparsec.Types          (Parser)
+import           Data.Monoid                    (mempty, mconcat, (<>))
 import           Prelude                        hiding (length, null, splitAt)
 
 
-newtype ParseP i p a' a b' b m r
-  = ParseP {
-    unParseP :: S.StateP [Maybe i] (E.EitherP SomeException p) a' a b' b m r
-    -- ^pipes-parse will use the type `[Maybe i]` for the leftover states,
-    -- so here we embrace that type till then.
-  } deriving (Functor, Applicative, Monad, MonadTrans, MonadIO, MFunctor,
-            P.Proxy, P.ProxyInternal)
-
-unParseK :: (t -> ParseP i p a' a b' b m r)
-         -> t -> S.StateP [Maybe i] (E.EitherP SomeException p) a' a b' b m r
-unParseK = (unParseP .)
-
-instance ProxyTrans (ParseP i) where
-  liftP = ParseP . liftP . liftP
-
-instance P.PFunctor (ParseP i) where
-  hoistP nat = wrap . (nat .) . unwrap
-    where wrap   = ParseP . S.StateP . (E.EitherP .)
-          unwrap = (E.runEitherP .) . S.unStateP . unParseP
-
-runParseP :: [Maybe i] -> ParseP i p a' a b' b m r
-          -> p a' a b' b m (Either SomeException (r, [Maybe i]))
-runParseP s = E.runEitherP . S.runStateP s . unParseP
-
-runParseK :: [Maybe i] -> (t -> ParseP i p a' a b' b m r)
-          -> (t -> p a' a b' b m (Either SomeException (r, [Maybe i])))
-runParseK s k q = runParseP s (k q)
-
--- | Like 'runParseP', but only only unrolls the given 'ParseP' up to an
--- 'E.EitherP SomeException' proxy transformer compatible with @ExceptionP@
--- from @pipes-safe@.
-tryRunParseP :: [Maybe i] -> ParseP i p a' a b' b m r
-             -> E.EitherP SomeException p a' a b' b m (r, [Maybe i])
-tryRunParseP s = S.runStateP s . unParseP
-
--- | Like 'runParseK', but only only unrolls the given 'ParseP' up to an
--- 'E.EitherP SomeException' proxy transformer compatible with @ExceptionP@
--- from @pipes-safe@.
-tryRunParseK :: [Maybe i] -> (t -> ParseP i p a' a b' b m r)
-             -> (t -> E.EitherP SomeException p a' a b' b m (r, [Maybe i]))
-tryRunParseK s k q = tryRunParseP s (k q)
-
 --------------------------------------------------------------------------------
-
-get :: (P.Proxy p, Monad m) => ParseP i p a' a b' b m [Maybe i]
-get = ParseP (S.StateP (\s -> E.right (s ,s)))
-{-# INLINABLE get #-}
-
-put :: (P.Proxy p, Monad m) => [Maybe i] -> ParseP i p a' a b' b m ()
-put s = ParseP (S.StateP (\_ -> E.right ((),s)))
-{-# INLINABLE put #-}
-
---------------------------------------------------------------------------------
--- Attoparsec interleaved parsing support
+-- Attoparsec interleaved parsing support for 'pipes-parse'.
 
 -- | 'ParseP specialized for Attoparsec integration.
-type AttoparsecP a = ParseP a
+type AttoparsecP a p = ParseP a (E.EitherP SomeException p)
+
+runAttoparsecP :: (Monad m, P.Proxy p)
+               => AttoparsecP a p a' a b' b m r
+               -> p a' a b' b m (Either SomeException r)
+runAttoparsecP = E.runEitherP . runParseP
+
+runAttoparsecK :: (Monad m, P.Proxy p)
+               => (t -> AttoparsecP a p a' a b' b m r)
+               -> (t -> p a' a b' b m (Either SomeException r))
+runAttoparsecK k q = runAttoparsecP (k q)
+
+--------------------------------------------------------------------------------
 
 -- | Parses input flowing downstream until.
 --
@@ -98,21 +53,24 @@ type AttoparsecP a = ParseP a
 --
 -- Requests `()` upstream when more input is needed.
 parseD :: (Monad m, AttoparsecInput a, P.Proxy p)
-       => Parser a r -> P.Pipe (AttoparsecP a p) a b m r
+       => Parser a r -> P.Pipe (AttoparsecP a p) (Maybe a) b m r
 parseD parser = (p >-> P.unitU) () where
-  p () = ParseP (S.StateP (\[s] -> do -- FIXME this is wrong, rely on `draw*`
-                                      -- from pipes-parse instead
-           (er,s') <- parseWith (P.request ()) parser s
+  p () = ParseP (S.StateP (\s1 -> do
+           -- TODO: Use 'draw'
+           let s1' = mayInput . mconcat $ s1 >>= maybe [] return
+           (er,s2) <- parseWith moreInput parser s1'
            case er of
              Left e  -> E.throw (toException e)
-             Right r -> return (r,[s']) ))
+             Right r -> let s2' = maybe [] (\a -> [Just a]) s2 in
+                        return (r, s2')))
+  moreInput = maybe mempty id <$> P.request ()
 {-# INLINABLE parseD #-}
 
 -- | Try to parse input flowing downstream.
 --
 -- Requests `()` upstream when more input is needed.
 maybeParseD :: (Monad m, AttoparsecInput a, P.Proxy p)
-            => Parser a r -> P.Pipe (AttoparsecP a p) a b m (Maybe r)
+            => Parser a r -> P.Pipe (AttoparsecP a p) (Maybe a) b m (Maybe r)
 maybeParseD = parseD . optional
 {-# INLINABLE maybeParseD #-}
 
@@ -121,70 +79,85 @@ maybeParseD = parseD . optional
 -- Requests `()` upstream when more input is needed.
 eitherParseD :: (Monad m, AttoparsecInput a, P.Proxy p)
              => Parser a r
-             -> P.Pipe (AttoparsecP a p) a b m (Either ParserError r)
+             -> P.Pipe (AttoparsecP a p) (Maybe a) b m (Either ParserError r)
 eitherParseD parser = (p >-> P.unitU) () where
-  p () = ParseP (S.StateP (\[s] -> -- FIXME this is wrong, rely on `draw*` from
-                                   -- pipes-parse instead
-         fmap (:[]) `fmap` parseWith (P.request ()) parser s))
+  p () = ParseP (S.StateP (\s1 -> do
+           -- TODO: Use 'draw'
+           let s1' = mayInput . mconcat $ s1 >>= maybe [] return
+           (er,s2) <- parseWith moreInput parser s1'
+           let s2' = maybe [] (\a -> [Just a]) s2
+           return (er, s2')))
+  moreInput = maybe mempty id <$> P.request ()
 {-# INLINABLE eitherParseD #-}
 
 --------------------------------------------------------------------------------
 -- Exported utilities
+--
+-- XXX: maybe we end up moving away these functions
 
--- | Pipe input flowing downstream up to length @n@, prepending any leftovers.
+-- | Pipe input flowing downstream up to length @n@ or first end-of-input,
+-- prepending any leftovers.
+--
+-- Returns the input lenght, which might be less than requested if an
+-- end-of-input was found.
 passN :: (Monad m, P.Proxy p, AttoparsecInput a)
-      => Int -> P.Pipe (AttoparsecP a p) a a m ()
-passN = nextInputN P.respond
+      => Int -> P.Pipe (AttoparsecP a p) (Maybe a) a m Int
+passN = onNextN P.respond
 {-# INLINABLE passN #-}
 
--- | Drop input flowing downstream up to length @n@, including any leftovers.
+-- | Drop input flowing downstream up to length @n@ or first end-of-input,
+-- prepending any leftovers.
+--
+-- Returns the input lenght, which might be less than requested if an
+-- end-of-input was found.
 skipN :: (Monad m, AttoparsecInput a, P.Proxy p)
-      => Int -> P.Pipe (AttoparsecP a p) a b m ()
-skipN = nextInputN (const (return ()))
+      => Int -> P.Pipe (AttoparsecP a p) (Maybe a) b m Int
+skipN = onNextN (const (return ()))
 {-# INLINABLE skipN #-}
 
 --------------------------------------------------------------------------------
 -- Internal utilities
 
--- | Pop input up to length @n@ from leftovers. Save any leftovers.
+-- | Receive input from upstream up to length @n@ or first end-of-input,
+-- prepending any previous leftovers, and apply the given action to each
+-- received chunk.
+--
+-- Returns the input lenght, which might be less than requested if an
+-- end-of-input was found.
+onNextN :: (Monad m, AttoparsecInput a, P.Proxy p)
+           => (a -> (AttoparsecP a p) () (Maybe a) () b m r)
+           -> Int -> (AttoparsecP a p) () (Maybe a) () b m Int
+onNextN f n0 = go n0 where
+  go n | n == n0   = return n
+       | otherwise = do
+           ma <- drawMay
+           case ma of
+             Nothing -> return n
+             Just a  -> do
+               let (p,s) = splitAt (n0 - n) a
+               when (not (null s)) (unDraw s)
+               f p >> go (n + length a)
+{-# INLINABLE onNextN #-}
+
+
+-- | Pop input up to length @n@ or first end-of-file from leftovers. Save any
+-- leftovers.
+--
+-- XXX: Maybe we don't need this function, since we are not using anymore.
 takeLeftovers :: (Monad m, P.Proxy p, AttoparsecInput a)
               => Int -> (AttoparsecP a p) a' a b' b m (Maybe a)
-takeLeftovers n = do
-  [lo] <- get -- TODO: use following elements of the list if needed.
-  case fmap (splitAt n) lo of
-    Nothing    -> return Nothing
-    Just (p,s) -> put [mayInput s] >> return (mayInput p)
+takeLeftovers n0 = ParseP (S.StateP (\s -> return (upTo n0 (Nothing, s))))
+  where
+    upTo _ x@(_  , [])             = x
+    upTo _   (acc, (Nothing:mlos)) = (acc,mlos)
+    upTo n   (acc, (Just lo:mlos))
+       | n' == n   = (acc', mlos')
+       | otherwise = upTo (n - n') (acc', mlos')
+       where
+         (p,s) = splitAt n lo
+         n'    = length p
+         mlos' = if null s then mlos else (Just s:mlos)
+         acc'  = if null p then acc
+                           else maybe (Just p) (\x -> Just (x<>p)) acc
 {-# INLINABLE takeLeftovers #-}
 
--- | Receive input from upstream up to length @n@ and apply the given action to
--- each received chunk. Return any leftovers.
-reqInputN :: (Monad (p () a b' b m), Monad m, AttoparsecInput a, P.Proxy p)
-          => (a -> p () a b' b m r) -> Int -> p () a b' b m (Maybe a)
-reqInputN f = go where
-  go n
-    | n <= 0    = P.return_P Nothing
-    | otherwise = do
-        (p,s) <- P.request () >>= P.return_P . splitAt n
-        _ <- f p
-        if null s
-          then go (n - length p)
-          else return (Just s)
-{-# INLINABLE reqInputN #-}
-
--- | Receive input from upstream up to length @n@ and apply the given action to
--- each received chunk, prepending any previous leftovers. Save any leftovers.
-nextInputN :: (Monad m, AttoparsecInput a, P.Proxy p)
-           => (a -> (AttoparsecP a p) () a b' b m r)
-           -> Int -> (AttoparsecP a p) () a b' b m ()
-nextInputN f n
-  | n <= 0    = return ()
-  | otherwise = do
-      mlo <- takeLeftovers n
-      case mlo of
-        Nothing -> fromUpstream n
-        Just lo -> f lo >> fromUpstream (n - length lo)
-  where
-    fromUpstream len
-      | len <= 0    = return ()
-      | otherwise = reqInputN f len >>= put . (:[])
-{-# INLINABLE nextInputN #-}

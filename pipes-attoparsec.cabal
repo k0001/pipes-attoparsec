@@ -40,6 +40,7 @@ library
     base (==4.*),
     mmorph (>=1.0),
     pipes (>=3.2.0),
+    pipes-parse (>=1.0 && <=1.1),
     attoparsec (>=0.10),
     bytestring,
     text,
