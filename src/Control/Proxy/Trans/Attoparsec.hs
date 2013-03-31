@@ -125,8 +125,8 @@ skipN = onNextN (const (return ()))
 -- Returns the input lenght, which might be less than requested if an
 -- end-of-input was found.
 onNextN :: (Monad m, AttoparsecInput a, P.Proxy p)
-           => (a -> (AttoparsecP a p) () (Maybe a) () b m r)
-           -> Int -> (AttoparsecP a p) () (Maybe a) () b m Int
+           => (a -> P.Pipe (AttoparsecP a p) (Maybe a) b m r)
+           -> Int -> P.Pipe (AttoparsecP a p) (Maybe a) b m Int
 onNextN f n0 = go n0 where
   go n | n == n0   = return n
        | otherwise = do
