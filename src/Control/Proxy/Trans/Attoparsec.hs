@@ -17,13 +17,12 @@ import           Control.Applicative            (optional, (<$>))
 import           Control.Exception              (SomeException, toException)
 import           Control.Monad
 import qualified Control.Proxy                  as P
-import           Control.Proxy.Parse            (runParseP, drawMay, unDraw)
-import           Control.Proxy.Parse.Internal   (ParseP(ParseP))
+import qualified Control.Proxy.Parse            as Y
 import           Control.Proxy.Attoparsec.Types
 import qualified Control.Proxy.Trans.Either     as E
 import qualified Control.Proxy.Trans.State      as S
 import           Data.Attoparsec.Types          (Parser)
-import           Data.Monoid                    (mempty, mconcat, (<>))
+import           Data.Monoid                    (mempty, (<>))
 import           Prelude                        hiding (length, null, splitAt)
 
 
@@ -31,12 +30,12 @@ import           Prelude                        hiding (length, null, splitAt)
 -- Attoparsec interleaved parsing support for 'pipes-parse'.
 
 -- | 'ParseP specialized for Attoparsec integration.
-type AttoparsecP a p = ParseP a (E.EitherP SomeException p)
+type AttoparsecP a p = Y.ParseP a (E.EitherP SomeException p)
 
 runAttoparsecP :: (Monad m, P.Proxy p)
                => AttoparsecP a p a' a b' b m r
                -> p a' a b' b m (Either SomeException r)
-runAttoparsecP = E.runEitherP . runParseP
+runAttoparsecP = E.runEitherP . Y.runParseP
 
 runAttoparsecK :: (Monad m, P.Proxy p)
                => (t -> AttoparsecP a p a' a b' b m r)
@@ -53,16 +52,14 @@ runAttoparsecK k q = runAttoparsecP (k q)
 -- Requests `()` upstream when more input is needed.
 parseD :: (Monad m, AttoparsecInput a, P.Proxy p)
        => Parser a r -> P.Pipe (AttoparsecP a p) (Maybe a) b m r
-parseD parser = ParseP (S.StateP go) where
-    go s1 = do
-        -- TODO: Use 'draw'
-        let s1' = mayInput . mconcat $ s1 >>= maybe [] return
-        (er,s2) <- parseWith moreInput parser s1'
-        case er of
-          Left e  -> E.throw (toException e)
-          Right r -> let s2' = maybe [] (\a -> [Just a]) s2 in
-                     return (r, s2')
-    moreInput = maybe mempty id <$> P.request ()
+parseD parser = do
+    (er,mlo) <- parseWith moreInput parser Nothing
+    maybe (return ()) Y.unDraw mlo
+    case er of
+      Left e  -> P.liftP $ E.throw (toException e)
+      Right r -> return r
+  where
+    moreInput = maybe mempty id <$> Y.drawMay
 {-# INLINABLE parseD #-}
 
 -- | Try to parse input flowing downstream.
@@ -79,14 +76,12 @@ maybeParseD = parseD . optional
 eitherParseD :: (Monad m, AttoparsecInput a, P.Proxy p)
              => Parser a r
              -> P.Pipe (AttoparsecP a p) (Maybe a) b m (Either ParserError r)
-eitherParseD parser = ParseP (S.StateP go) where
-    go s1 = do
-        -- TODO: Use 'draw'
-        let s1' = mayInput . mconcat $ s1 >>= maybe [] return
-        (er,s2) <- parseWith moreInput parser s1'
-        let s2' = maybe [] (\a -> [Just a]) s2
-        return (er, s2')
-    moreInput = maybe mempty id <$> P.request ()
+eitherParseD parser = do
+    (er,mlo) <- parseWith moreInput parser Nothing
+    maybe (return ()) Y.unDraw mlo
+    return er
+  where
+    moreInput = maybe mempty id <$> Y.drawMay
 {-# INLINABLE eitherParseD #-}
 
 --------------------------------------------------------------------------------
@@ -129,12 +124,12 @@ onNextN :: (Monad m, AttoparsecInput a, P.Proxy p)
 onNextN f n0 = go n0 where
   go n | n == n0   = return n
        | otherwise = do
-           ma <- drawMay
+           ma <- Y.drawMay
            case ma of
              Nothing -> return n
              Just a  -> do
                let (p,s) = splitAt (n0 - n) a
-               when (not (null s)) (unDraw s)
+               when (not (null s)) (Y.unDraw s)
                f p >> go (n + length a)
 {-# INLINABLE onNextN #-}
 
@@ -145,7 +140,7 @@ onNextN f n0 = go n0 where
 -- XXX: Maybe we don't need this function, since we are not using anymore.
 takeLeftovers :: (Monad m, P.Proxy p, AttoparsecInput a)
               => Int -> (AttoparsecP a p) a' a b' b m (Maybe a)
-takeLeftovers n0 = ParseP (S.StateP (\s -> return (upTo n0 (Nothing, s))))
+takeLeftovers n0 = Y.ParseP (S.StateP (\s -> return (upTo n0 (Nothing, s))))
   where
     upTo _ x@(_  , [])             = x
     upTo _   (acc, (Nothing:mlos)) = (acc,mlos)
