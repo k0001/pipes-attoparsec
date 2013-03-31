@@ -16,7 +16,6 @@ module Control.Proxy.Trans.Attoparsec
 import           Control.Applicative            (optional, (<$>))
 import           Control.Exception              (SomeException, toException)
 import           Control.Monad
-import           Control.Proxy                  ((>->))
 import qualified Control.Proxy                  as P
 import           Control.Proxy.Parse            (runParseP, drawMay, unDraw)
 import           Control.Proxy.Parse.Internal   (ParseP(ParseP))
@@ -54,16 +53,16 @@ runAttoparsecK k q = runAttoparsecP (k q)
 -- Requests `()` upstream when more input is needed.
 parseD :: (Monad m, AttoparsecInput a, P.Proxy p)
        => Parser a r -> P.Pipe (AttoparsecP a p) (Maybe a) b m r
-parseD parser = (p >-> P.unitU) () where
-  p () = ParseP (S.StateP (\s1 -> do
-           -- TODO: Use 'draw'
-           let s1' = mayInput . mconcat $ s1 >>= maybe [] return
-           (er,s2) <- parseWith moreInput parser s1'
-           case er of
-             Left e  -> E.throw (toException e)
-             Right r -> let s2' = maybe [] (\a -> [Just a]) s2 in
-                        return (r, s2')))
-  moreInput = maybe mempty id <$> P.request ()
+parseD parser = ParseP (S.StateP go) where
+    go s1 = do
+        -- TODO: Use 'draw'
+        let s1' = mayInput . mconcat $ s1 >>= maybe [] return
+        (er,s2) <- parseWith moreInput parser s1'
+        case er of
+          Left e  -> E.throw (toException e)
+          Right r -> let s2' = maybe [] (\a -> [Just a]) s2 in
+                     return (r, s2')
+    moreInput = maybe mempty id <$> P.request ()
 {-# INLINABLE parseD #-}
 
 -- | Try to parse input flowing downstream.
@@ -80,14 +79,14 @@ maybeParseD = parseD . optional
 eitherParseD :: (Monad m, AttoparsecInput a, P.Proxy p)
              => Parser a r
              -> P.Pipe (AttoparsecP a p) (Maybe a) b m (Either ParserError r)
-eitherParseD parser = (p >-> P.unitU) () where
-  p () = ParseP (S.StateP (\s1 -> do
-           -- TODO: Use 'draw'
-           let s1' = mayInput . mconcat $ s1 >>= maybe [] return
-           (er,s2) <- parseWith moreInput parser s1'
-           let s2' = maybe [] (\a -> [Just a]) s2
-           return (er, s2')))
-  moreInput = maybe mempty id <$> P.request ()
+eitherParseD parser = ParseP (S.StateP go) where
+    go s1 = do
+        -- TODO: Use 'draw'
+        let s1' = mayInput . mconcat $ s1 >>= maybe [] return
+        (er,s2) <- parseWith moreInput parser s1'
+        let s2' = maybe [] (\a -> [Just a]) s2
+        return (er, s2')
+    moreInput = maybe mempty id <$> P.request ()
 {-# INLINABLE eitherParseD #-}
 
 --------------------------------------------------------------------------------
