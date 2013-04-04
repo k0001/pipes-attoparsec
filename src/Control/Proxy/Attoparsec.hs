@@ -1,94 +1,118 @@
--- | This module provides utilities to turn your Attoparsec @'Parser' a
--- b@ into a 'Pipe' that parses @a@ values into @b@ values as they flow
--- downstream.
---
--- See "Control.Proxy.Attoparsec.Tutorial" for an extensive introduction
--- with examples.
+-- | This module allows you to interleave Attoparsec parsing on input flowing
+-- downstream through pipes. This module builds on top of the 'pipes-parse'
+-- package, so the functionality exported by that package can be reused here.
 
 module Control.Proxy.Attoparsec
-  ( -- * Parsing Pipe
-    -- $pieces
-    parserInputD
-  , parserD
-    -- * Modules
-  , module Control.Proxy.Attoparsec.Types
-  , module Control.Proxy.Attoparsec.Control
+  ( -- * Interleaved parsing
+    parseD
+  , maybeParseD
+  , eitherParseD
+    -- * Utils
+  , passN
+  , skipN
+    -- * Exports
+  , I.ParserError(..)
   ) where
 
-import           Control.Proxy
-import           Control.Proxy.Attoparsec.Control
-import           Control.Proxy.Attoparsec.Types
-import           Data.Attoparsec.Types            (IResult (..), Parser)
-import           Prelude                          hiding (length, null)
+import           Control.Monad
+import qualified Control.Proxy                     as P
+import           Control.Proxy.Parse               (ParseP, drawMay, unDraw)
+import qualified Control.Proxy.Attoparsec.Internal as I
+import qualified Control.Proxy.Trans.Either        as E
+import           Data.Attoparsec.Types             (Parser)
 
 
--- $pieces
+--------------------------------------------------------------------------------
+-- | Parses input flowing downstream until it either succeeds or fails.
 --
--- A 'Pipe' that parses @a@ input flowing downstream into @b@ values is
--- made of at least two smaller cooperating 'Proxy's:
+-- In case of parsing errors, a 'ParserError' exception is thrown in the
+-- 'E.EitherP' proxy transformer.
 --
---  1. 'parserInputD': Prepares @a@ input received from upstream to be
---     consumed by a downstream parsing 'Proxy'.
+-- Requests `()` upstream when more input is needed.
+parseD :: (Monad m, I.AttoparsecInput a, P.Proxy p)
+       => Parser a r
+       -> P.Pipe (ParseP a (E.EitherP I.ParserError p)) (Maybe a) b m r
+parseD parser = do
+    (er,mlo) <- I.parseWithMay drawMay parser
+    maybe (return ()) unDraw mlo
+    case er of
+      Left e  -> P.liftP $ E.throw e
+      Right r -> return r
+{-# INLINABLE parseD #-}
+
+-- | Try to parse input flowing downstream, return 'Nothing' in case of parsing
+-- failures.
 --
---  2. 'parserD': Repeatedly runs a given @'Parser' a b@ on input 'a'
---     from upstream, and sends 'b' values downstream.
+-- Requests `()` upstream when more input is needed.
+maybeParseD :: (Monad m, I.AttoparsecInput a, P.Proxy p)
+            => Parser a r -> P.Pipe (ParseP a p) (Maybe a) b m (Maybe r)
+maybeParseD parser = do
+    (er,mlo) <- I.parseWithMay drawMay parser
+    maybe (return ()) unDraw mlo
+    case er of
+      Left _  -> return Nothing
+      Right r -> return (Just r)
+{-# INLINABLE maybeParseD #-}
+
+-- | Try to parse input flowing downstream, return 'Left' in case of Parseing
+-- failures.
 --
--- Given a @'Parser' a b@ named @myParser@, the simplest way to use
--- these 'Proxy's together is:
+-- Requests `()` upstream when more input is needed.
+eitherParseD :: (Monad m, I.AttoparsecInput a, P.Proxy p)
+             => Parser a r
+             -> P.Pipe (ParseP a p) (Maybe a) b m (Either I.ParserError r)
+eitherParseD parser = do
+    (er,mlo) <- I.parseWithMay drawMay parser
+    maybe (return ()) unDraw mlo
+    return er
+{-# INLINABLE eitherParseD #-}
+
+--------------------------------------------------------------------------------
+-- Exported utilities
 --
--- > myParsingPipe :: (Proxy p, Monad m, AttoparsecInput a) => Pipe a b m r
--- > myParsingPipe = parserInputD >-> parserD myParser
+-- XXX: maybe we end up moving away these functions
+
+-- | Pipe input flowing downstream up to length @n@ or first end-of-input,
+-- prepending any leftovers.
 --
--- In between these two 'Proxy's, you can place other 'Proxy's to handle
--- extraordinary situations like parsing failures or limiting input
--- length. "Control.Proxy.Attoparsec.Control" exports some useful
--- 'Proxy's that fit this place. If you skip using any of those, the
--- default behavior is that of
--- 'Control.Proxy.Attoparsec.Control.skipMalformedChunks': to simply
--- ignore all parsing errors and malformed input, and start parsing new
--- input as soon as it's available.
+-- Returns the input lenght, which might be less than requested if an
+-- end-of-input was found.
+passN :: (Monad m, P.Proxy p, I.AttoparsecInput a)
+      => Int -> P.Pipe (ParseP a p) (Maybe a) a m Int
+passN = onNextN P.respond
+{-# INLINABLE passN #-}
 
-
-
--- | 'Proxy' turning 'a' values flowing downstream into
--- @'ParserSupply' a@ values to be consumed by a downstream parsing
--- 'Proxy'.
+-- | Drop input flowing downstream up to length @n@ or first end-of-input,
+-- prepending any leftovers.
 --
--- This 'Proxy' responds with @'Resume' a@ to any 'ParserStatus' value
--- received from downstream.
-parserInputD :: (Monad m, Proxy p)
-             => ParserStatus a -> p () a (ParserStatus a) (ParserSupply a) m r
-parserInputD _ = runIdentityP . forever $ request () >>= respond . (,) Resume
+-- Returns the input lenght, which might be less than requested if an
+-- end-of-input was found.
+skipN :: (Monad m, I.AttoparsecInput a, P.Proxy p)
+      => Int -> P.Pipe (ParseP a p) (Maybe a) b m Int
+skipN = onNextN (const (return ()))
+{-# INLINABLE skipN #-}
 
+--------------------------------------------------------------------------------
+-- Internal utilities
 
--- | 'Proxy' using the given @'Parser' a b@ to repeatedly parse pieces
--- of @'ParserSupply' a@ values flowing downstream into @b@ values.
+-- | Receive input from upstream up to length @n@ or first end-of-input,
+-- prepending any previous leftovers, and apply the given action to each
+-- received chunk.
 --
--- When more input is needed, a @'ParserStatus' a@ value reporting the
--- current parsing status is sent upstream, and in exchange a
--- @'ParserSupply' a@ value is expected, containing more input to be
--- parsed and directives on how to use it (see 'ParserSupply'
--- documentation).
-parserD :: (Proxy p, Monad m, AttoparsecInput a)
-        => Parser a b
-        -> () -> p (ParserStatus a) (ParserSupply a) () b m r
-parserD parser () = runIdentityP . forever $ ask k0 0 (Parsing 0)
-  where
-    k0 = parse parser
-
-    requestNonEmpty status = go where
-      go = do
-        ps@(_, chunk) <- request status
-        if null chunk then go else return ps
-
-    ask k len status = do
-      (su, chunk) <- requestNonEmpty status
-      case su of
-        Start  -> use (k0 chunk) 0
-        Resume -> use (k  chunk) (len + length chunk)
-
-    use (Partial k)         len = ask k  len $ Parsing len
-    use (Fail rest ctx msg) _   = ask k0 0   $ Failed rest (ParserError ctx msg)
-    use (Done rest result)  _   = respond result >> use (k0 rest) 0
-
+-- Returns the input lenght, which might be less than requested if an
+-- end-of-input was found.
+onNextN :: (Monad m, I.AttoparsecInput a, P.Proxy p)
+           => (a -> P.Pipe (ParseP  a p) (Maybe a) b m r)
+           -> Int -> P.Pipe (ParseP a p) (Maybe a) b m Int
+onNextN f n0 = go n0 where
+  go n | n == n0   = return n
+       | otherwise = do
+           ma <- drawMay
+           case ma of
+             Nothing -> return n
+             Just a  -> do
+               let (p,s) = I.splitAt (n0 - n) a
+               when (not (I.null s)) (unDraw s)
+               f p >> go (n + I.length a)
+{-# INLINABLE onNextN #-}
 

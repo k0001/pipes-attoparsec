@@ -32,10 +32,7 @@ source-repository head
 library
   hs-source-dirs:  src
   exposed-modules: Control.Proxy.Attoparsec
-                   Control.Proxy.Attoparsec.Control
-                   Control.Proxy.Attoparsec.Tutorial
-                   Control.Proxy.Attoparsec.Types
-                   Control.Proxy.Trans.Attoparsec
+                   Control.Proxy.Attoparsec.Internal
   build-depends:
     base (==4.*),
     mmorph (>=1.0),
