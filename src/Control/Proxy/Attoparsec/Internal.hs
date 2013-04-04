@@ -83,16 +83,17 @@ parseWith refill p = step . parse p =<< refill where
     step (Partial k)  = step . k =<< refill
     step (Done t r)   = return (Right r, mayInput t)
     step (Fail t c m) = return (Left (ParserError c m), mayInput t)
+{-# INLINABLE parseWith #-}
 
 -- | Like 'parseWith', except the given monadic action might return either
 -- `Nothing` or `Just mempty` to signal that no more input is available.
 parseWithMay :: (Monad m, AttoparsecInput a)
              => m (Maybe a) -> Parser a b -> m (Either ParserError b, Maybe a)
 parseWithMay refill = parseWith (return . maybe mempty id =<< refill)
-
+{-# INLINABLE parseWithMay #-}
 
 -- | Wrap @a@ in 'Just' if not-null. Otherwise, 'Nothing'.
 mayInput :: AttoparsecInput a => a -> Maybe a
 mayInput x | null x    = Nothing
            | otherwise = Just x
-
+{-# INLINABLE mayInput #-}
