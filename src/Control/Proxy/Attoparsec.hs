@@ -17,7 +17,8 @@ module Control.Proxy.Attoparsec
 import           Control.Monad
 import           Control.Monad.ST                  (ST)
 import qualified Control.Proxy                     as P
-import           Control.Proxy.Parse               (ParseP, drawMay, unDraw)
+import           Control.Proxy.Parse               (ParseP)
+import qualified Control.Proxy.Parse               as Pa
 import qualified Control.Proxy.Attoparsec.Internal as I
 import qualified Control.Proxy.Trans.Either        as E
 import           Data.Attoparsec.Types             (Parser)
@@ -34,8 +35,8 @@ parseD :: (I.AttoparsecInput a, P.Proxy p)
        => Parser a r
        -> P.Pipe (ParseP s a (E.EitherP I.ParserError p)) (Maybe a) b (ST s) r
 parseD parser = do
-    (er,mlo) <- I.parseWithMay drawMay parser
-    maybe (return ()) unDraw mlo
+    (er,mlo) <- I.parseWithMay Pa.drawMay parser
+    maybe (return ()) Pa.unDraw mlo
     case er of
       Left e  -> P.liftP $ E.throw e
       Right r -> return r
@@ -48,8 +49,8 @@ parseD parser = do
 maybeParseD :: (I.AttoparsecInput a, P.Proxy p)
             => Parser a r -> P.Pipe (ParseP s a p) (Maybe a) b (ST s) (Maybe r)
 maybeParseD parser = do
-    (er,mlo) <- I.parseWithMay drawMay parser
-    maybe (return ()) unDraw mlo
+    (er,mlo) <- I.parseWithMay Pa.drawMay parser
+    maybe (return ()) Pa.unDraw mlo
     case er of
       Left _  -> return Nothing
       Right r -> return (Just r)
@@ -63,8 +64,8 @@ eitherParseD :: (I.AttoparsecInput a, P.Proxy p)
              => Parser a r
              -> P.Pipe (ParseP s a p) (Maybe a) b (ST s) (Either I.ParserError r)
 eitherParseD parser = do
-    (er,mlo) <- I.parseWithMay drawMay parser
-    maybe (return ()) unDraw mlo
+    (er,mlo) <- I.parseWithMay Pa.drawMay parser
+    maybe (return ()) Pa.unDraw mlo
     return er
 {-# INLINABLE eitherParseD #-}
 
@@ -108,12 +109,12 @@ onNextN :: (I.AttoparsecInput a, P.Proxy p)
 onNextN f n0 = go n0 where
   go n | n == n0   = return n
        | otherwise = do
-           ma <- drawMay
+           ma <- Pa.drawMay
            case ma of
              Nothing -> return n
              Just a  -> do
                let (p,s) = I.splitAt (n0 - n) a
-               when (not (I.null s)) (unDraw s)
+               when (not (I.null s)) (Pa.unDraw s)
                f p >> go (n + I.length a)
 {-# INLINABLE onNextN #-}
 
