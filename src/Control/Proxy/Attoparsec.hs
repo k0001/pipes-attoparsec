@@ -15,6 +15,7 @@ module Control.Proxy.Attoparsec
   ) where
 
 import           Control.Monad
+import           Control.Monad.ST                  (ST)
 import qualified Control.Proxy                     as P
 import           Control.Proxy.Parse               (ParseP, drawMay, unDraw)
 import qualified Control.Proxy.Attoparsec.Internal as I
@@ -29,9 +30,9 @@ import           Data.Attoparsec.Types             (Parser)
 -- 'E.EitherP' proxy transformer.
 --
 -- Requests `()` upstream when more input is needed.
-parseD :: (Monad m, I.AttoparsecInput a, P.Proxy p)
+parseD :: (I.AttoparsecInput a, P.Proxy p)
        => Parser a r
-       -> P.Pipe (ParseP a (E.EitherP I.ParserError p)) (Maybe a) b m r
+       -> P.Pipe (ParseP s a (E.EitherP I.ParserError p)) (Maybe a) b (ST s) r
 parseD parser = do
     (er,mlo) <- I.parseWithMay drawMay parser
     maybe (return ()) unDraw mlo
@@ -44,8 +45,8 @@ parseD parser = do
 -- failures.
 --
 -- Requests `()` upstream when more input is needed.
-maybeParseD :: (Monad m, I.AttoparsecInput a, P.Proxy p)
-            => Parser a r -> P.Pipe (ParseP a p) (Maybe a) b m (Maybe r)
+maybeParseD :: (I.AttoparsecInput a, P.Proxy p)
+            => Parser a r -> P.Pipe (ParseP s a p) (Maybe a) b (ST s) (Maybe r)
 maybeParseD parser = do
     (er,mlo) <- I.parseWithMay drawMay parser
     maybe (return ()) unDraw mlo
@@ -58,9 +59,9 @@ maybeParseD parser = do
 -- failures.
 --
 -- Requests `()` upstream when more input is needed.
-eitherParseD :: (Monad m, I.AttoparsecInput a, P.Proxy p)
+eitherParseD :: (I.AttoparsecInput a, P.Proxy p)
              => Parser a r
-             -> P.Pipe (ParseP a p) (Maybe a) b m (Either I.ParserError r)
+             -> P.Pipe (ParseP s a p) (Maybe a) b (ST s) (Either I.ParserError r)
 eitherParseD parser = do
     (er,mlo) <- I.parseWithMay drawMay parser
     maybe (return ()) unDraw mlo
@@ -77,8 +78,8 @@ eitherParseD parser = do
 --
 -- Returns the input lenght, which might be less than requested if an
 -- end-of-input was found.
-passN :: (Monad m, P.Proxy p, I.AttoparsecInput a)
-      => Int -> P.Pipe (ParseP a p) (Maybe a) a m Int
+passN :: (P.Proxy p, I.AttoparsecInput a)
+      => Int -> P.Pipe (ParseP s a p) (Maybe a) a (ST s) Int
 passN = onNextN P.respond
 {-# INLINABLE passN #-}
 
@@ -87,8 +88,8 @@ passN = onNextN P.respond
 --
 -- Returns the input lenght, which might be less than requested if an
 -- end-of-input was found.
-skipN :: (Monad m, I.AttoparsecInput a, P.Proxy p)
-      => Int -> P.Pipe (ParseP a p) (Maybe a) b m Int
+skipN :: (I.AttoparsecInput a, P.Proxy p)
+      => Int -> P.Pipe (ParseP s a p) (Maybe a) b (ST s) Int
 skipN = onNextN (const (return ()))
 {-# INLINABLE skipN #-}
 
@@ -101,9 +102,9 @@ skipN = onNextN (const (return ()))
 --
 -- Returns the input lenght, which might be less than requested if an
 -- end-of-input was found.
-onNextN :: (Monad m, I.AttoparsecInput a, P.Proxy p)
-           => (a -> P.Pipe (ParseP  a p) (Maybe a) b m r)
-           -> Int -> P.Pipe (ParseP a p) (Maybe a) b m Int
+onNextN :: (I.AttoparsecInput a, P.Proxy p)
+        => (a  -> P.Pipe (ParseP s a p) (Maybe a) b (ST s) r)
+        -> Int -> P.Pipe (ParseP s a p) (Maybe a) b (ST s) Int
 onNextN f n0 = go n0 where
   go n | n == n0   = return n
        | otherwise = do
