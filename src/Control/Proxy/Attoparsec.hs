@@ -114,6 +114,5 @@ onNextN f n0 = go 0 where
              Just a  -> do
                let (p,s) = I.splitAt (n0 - n) a
                when (not (I.null s)) (Pa.unDraw s)
-               f p >> go (n + I.length a)
+               f p >> go (n + I.length p)
 {-# INLINABLE onNextN #-}
-
