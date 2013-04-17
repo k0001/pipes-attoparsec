@@ -23,9 +23,8 @@ import qualified Control.Proxy.Attoparsec.Internal as I
 import qualified Control.Proxy.Trans.Either        as E
 import           Data.Attoparsec.Types             (Parser)
 
-
 --------------------------------------------------------------------------------
--- | Parses input flowing downstream until it either succeeds or fails.
+-- | Parses input flowing downstream until parsing either succeeds or fails.
 --
 -- In case of parsing errors, a 'ParserError' exception is thrown in the
 -- 'E.EitherP' proxy transformer.
@@ -56,7 +55,7 @@ maybeParseD parser = do
       Right r -> return (Just r)
 {-# INLINABLE maybeParseD #-}
 
--- | Try to parse input flowing downstream, return 'Left' in case of Parseing
+-- | Try to parse input flowing downstream, return 'Left' in case of parsing
 -- failures.
 --
 -- Requests `()` upstream when more input is needed.
@@ -77,7 +76,7 @@ eitherParseD parser = do
 -- | Pipe input flowing downstream up to length @n@ or first end-of-input,
 -- prepending any leftovers.
 --
--- Returns the input lenght, which might be less than requested if an
+-- Returns the passed input lenght, which might be less than requested if an
 -- end-of-input was found.
 passN :: (P.Proxy p, I.AttoparsecInput a)
       => Int -> P.Pipe (ParseP s a p) (Maybe a) a (ST s) Int
@@ -87,7 +86,7 @@ passN = onNextN P.respond
 -- | Drop input flowing downstream up to length @n@ or first end-of-input,
 -- prepending any leftovers.
 --
--- Returns the input lenght, which might be less than requested if an
+-- Returns the skipped input lenght, which might be less than requested if an
 -- end-of-input was found.
 skipN :: (I.AttoparsecInput a, P.Proxy p)
       => Int -> P.Pipe (ParseP s a p) (Maybe a) b (ST s) Int
@@ -101,13 +100,13 @@ skipN = onNextN (const (return ()))
 -- prepending any previous leftovers, and apply the given action to each
 -- received chunk.
 --
--- Returns the input lenght, which might be less than requested if an
+-- Returns the used input lenght, which might be less than requested if an
 -- end-of-input was found.
 onNextN :: (I.AttoparsecInput a, P.Proxy p)
         => (a  -> P.Pipe (ParseP s a p) (Maybe a) b (ST s) r)
         -> Int -> P.Pipe (ParseP s a p) (Maybe a) b (ST s) Int
-onNextN f n0 = go n0 where
-  go n | n == n0   = return n
+onNextN f n0 = go 0 where
+  go n | n == n0   = return n0
        | otherwise = do
            ma <- Pa.drawMay
            case ma of
