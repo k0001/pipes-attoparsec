@@ -1,19 +1,18 @@
-name: pipes-attoparsec
-version: 0.2
-license: BSD3
-license-file: LICENSE
-copyright: Copyright (c) Paolo Capriotti 2012-2012,
-                         Renzo Carbonara 2012-2013
-author: Paolo Capriotti, Renzo Carbonara
-maintainer: renzocarbonaraλgmail.com
-stability: Experimental
-tested-with: GHC ==7.4.1, GHC ==7.6.1
-homepage: https://github.com/k0001/pipes-attoparsec
-bug-reports: https://github.com/k0001/pipes-attoparsec/issues
-category: Pipes, Parser
-build-type: Simple
-cabal-version: >=1.8
-synopsis: Attoparsec and Pipes integration.
+name:           pipes-attoparsec
+version:        0.2
+license:        BSD3
+license-file:   LICENSE
+copyright:      Copyright (c) Paolo Capriotti 2012, Renzo Carbonara 2012-2013
+author:         Paolo Capriotti, Renzo Carbonara
+maintainer:     renzocarbonaraλgmail.com
+stability:      Experimental
+tested-with:    GHC ==7.4.1, GHC ==7.6.1
+homepage:       https://github.com/k0001/pipes-attoparsec
+bug-reports:    https://github.com/k0001/pipes-attoparsec/issues
+category:       Pipes, Parser
+build-type:     Simple
+cabal-version:  >=1.8
+synopsis:       Attoparsec and Pipes integration.
 description:
   Utilities to integrate @attoparsec@ 'Data.Attoparsec.Types.Parser'
   and a @pipes@ 'Control.Proxy.Class.Proxy'.
@@ -34,14 +33,14 @@ library
   exposed-modules: Control.Proxy.Attoparsec
                    Control.Proxy.Attoparsec.Internal
   build-depends:
-    base (==4.*),
-    mmorph (>=1.0),
-    pipes (>=3.2.0),
-    pipes-parse (>=1.0 && <=1.1),
-    attoparsec (>=0.10),
-    bytestring,
-    text,
-    transformers (>=0.2 && <=0.4)
+      base         (==4.*)
+    , mmorph       (>=1.0)
+    , pipes        (>=3.2)
+    , pipes-parse  (>=1.0 && <=1.1)
+    , attoparsec   (>=0.10)
+    , bytestring
+    , text
+    , transformers (>=0.2 && <=0.4)
 
   ghc-options: -Wall
 
@@ -54,15 +53,15 @@ test-suite tests
   ghc-options: -Wall -rtsopts -fno-warn-missing-signatures
 
   build-depends:
-    base (== 4.*),
-    mmorph (>= 1.0),
-    pipes (>= 3.2.0),
-    attoparsec (>= 0.10),
-    text,
-    pipes-attoparsec,
-    QuickCheck (== 2.*),
-    HUnit (== 1.*),
-    test-framework (>= 0.6),
-    test-framework-quickcheck2 (>= 0.2),
-    test-framework-hunit (>= 0.2)
+      base
+    , mmorph
+    , pipes
+    , attoparsec
+    , text
+    , pipes-attoparsec
+    , QuickCheck                 (== 2.*)
+    , HUnit                      (== 1.*)
+    , test-framework             (>= 0.6)
+    , test-framework-quickcheck2 (>= 0.2)
+    , test-framework-hunit       (>= 0.2)
 
