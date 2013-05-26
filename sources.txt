@@ -1,2 +1,2 @@
 ./
-git://github.com/Gabriel439/Haskell-Pipes-Parse-Library.git spud
+git://github.com/Gabriel439/Haskell-Pipes-Handle-Library.git
