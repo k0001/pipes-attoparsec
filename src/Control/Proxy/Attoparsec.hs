@@ -31,7 +31,7 @@ parseD
   :: (I.AttoparsecInput a, Monad m, P.Proxy p)
   => Parser a r
   -> ()
-  -> Pe.EitherP I.ParserError (Ps.StateP [Maybe a] p) () (Maybe a) b' b m r
+  -> Pe.EitherP I.ParserError (Ps.StateP [a] p) () (Maybe a) b' b m r
 parseD parser = \() -> do
     (er, mlo) <- P.liftP $ I.parseWithMay Pa.draw parser
     P.liftP $ mapM_ Pa.unDraw mlo
@@ -48,7 +48,7 @@ maybeParseD
   :: (I.AttoparsecInput a, Monad m, P.Proxy p)
   => Parser a r
   -> ()
-  -> Ps.StateP [Maybe a] p () (Maybe a) b' b m (Maybe r)
+  -> Ps.StateP [a] p () (Maybe a) b' b m (Maybe r)
 maybeParseD parser = \() -> do
     (er,mlo) <- I.parseWithMay Pa.draw parser
     mapM_ Pa.unDraw mlo
@@ -65,7 +65,7 @@ eitherParseD
   :: (I.AttoparsecInput a, Monad m, P.Proxy p)
   => Parser a r
   -> ()
-  -> Ps.StateP [Maybe a] p () (Maybe a) b' b m (Either I.ParserError r)
+  -> Ps.StateP [a] p () (Maybe a) b' b m (Either I.ParserError r)
 eitherParseD parser = \() -> do
     (er,mlo) <- I.parseWithMay Pa.draw parser
     mapM_ Pa.unDraw mlo
