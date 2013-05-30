@@ -32,6 +32,7 @@ library
   hs-source-dirs:  src
   exposed-modules: Control.Proxy.Attoparsec
                    Control.Proxy.Attoparsec.Internal
+                   Control.Proxy.Attoparsec.Types
   build-depends:
       base         (==4.*)
     , mmorph       (>=1.0 && <1.1)
@@ -42,7 +43,7 @@ library
     , text
     , transformers (>=0.2 && <=0.4)
 
-  ghc-options: -Wall
+  ghc-options: -Wall -O2
 
 test-suite tests
   type:           exitcode-stdio-1.0
