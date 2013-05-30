@@ -5,7 +5,6 @@
 module Control.Proxy.Attoparsec
   ( -- * Parsing
     parseD
-  , maybeParseD
   , eitherParseD
     -- * Exports
   , module Control.Proxy.Attoparsec.Types
@@ -14,7 +13,7 @@ module Control.Proxy.Attoparsec
 --------------------------------------------------------------------------------
 
 import qualified Control.Proxy                     as P
-import qualified Control.Proxy.Parse               as Pa (draw, unDraw)
+import qualified Control.Proxy.Parse               as Pa
 import qualified Control.Proxy.Attoparsec.Internal as I
 import           Control.Proxy.Attoparsec.Types
 import qualified Control.Proxy.Trans.Either        as Pe (EitherP, throw)
@@ -37,44 +36,25 @@ parseD
   :: (ParserInput a, Monad m, P.Proxy p)
   => Parser a r
   -> ()
-  -> Pe.EitherP ParsingError (Ps.StateP [a] p) () (Maybe a) b' b m r
+  -> Pe.EitherP ParsingError (Ps.StateP [a] p) () (Maybe a) b' b m (Maybe r)
 parseD parser = \() -> do
-    (er, mlo) <- P.liftP $ I.parseWithMay Pa.draw parser
-    P.liftP $ mapM_ Pa.unDraw mlo
-    case er of
-      Left e  -> Pe.throw e
-      Right r -> return r
+    eof <- P.liftP $ Pa.isEndOfInput
+    if eof
+      then return Nothing
+      else do
+        (er, mlo) <- P.liftP $ I.parseWithMay Pa.draw parser
+        P.liftP $ mapM_ Pa.unDraw mlo
+        case er of
+          Left e  -> Pe.throw e
+          Right r -> return (Just r)
 {-# SPECIALIZE parseD
       :: (Monad m, P.Proxy p) => Parser B.ByteString r -> ()
       -> Pe.EitherP ParsingError (Ps.StateP [B.ByteString] p)
-         () (Maybe B.ByteString) b' b m r #-}
+         () (Maybe B.ByteString) b' b m (Maybe r) #-}
 {-# SPECIALIZE parseD
       :: (Monad m, P.Proxy p) => Parser T.Text r -> ()
       -> Pe.EitherP ParsingError (Ps.StateP [T.Text] p)
-         () (Maybe T.Text) b' b m r #-}
-
-
--- | Try to parse input flowing downstream, return 'Nothing' in case of parsing
--- failures.
---
--- Requests more input from upstream using 'Pa.draw', when needed.
-maybeParseD
-  :: (ParserInput a, Monad m, P.Proxy p)
-  => Parser a r
-  -> ()
-  -> Ps.StateP [a] p () (Maybe a) b' b m (Maybe r)
-maybeParseD parser = \() -> do
-    (er,mlo) <- I.parseWithMay Pa.draw parser
-    mapM_ Pa.unDraw mlo
-    case er of
-      Left _  -> return Nothing
-      Right r -> return (Just r)
-{-# SPECIALIZE maybeParseD
-    :: (Monad m, P.Proxy p) => Parser B.ByteString r -> ()
-    -> Ps.StateP [B.ByteString] p () (Maybe B.ByteString) b' b m (Maybe r) #-}
-{-# SPECIALIZE maybeParseD
-    :: (Monad m, P.Proxy p) => Parser T.Text r -> ()
-    -> Ps.StateP [T.Text] p () (Maybe T.Text) b' b m (Maybe r) #-}
+         () (Maybe T.Text) b' b m (Maybe r) #-}
 
 
 -- | Try to parse input flowing downstream, return 'Left' in case of parsing
@@ -85,16 +65,20 @@ eitherParseD
   :: (ParserInput a, Monad m, P.Proxy p)
   => Parser a r
   -> ()
-  -> Ps.StateP [a] p () (Maybe a) b' b m (Either ParsingError r)
+  -> Ps.StateP [a] p () (Maybe a) b' b m (Maybe (Either ParsingError r))
 eitherParseD parser = \() -> do
-    (er,mlo) <- I.parseWithMay Pa.draw parser
-    mapM_ Pa.unDraw mlo
-    return er
+    eof <- Pa.isEndOfInput
+    if eof
+      then return Nothing
+      else do
+        (er,mlo) <- I.parseWithMay Pa.draw parser
+        mapM_ Pa.unDraw mlo
+        return (Just er)
 {-# SPECIALIZE eitherParseD
       :: (Monad m, P.Proxy p) => Parser B.ByteString r -> ()
       -> Ps.StateP [B.ByteString] p () (Maybe B.ByteString) b' b m
-         (Either ParsingError r) #-}
+         (Maybe (Either ParsingError r)) #-}
 {-# SPECIALIZE eitherParseD
       :: (Monad m, P.Proxy p) => Parser T.Text r -> ()
       -> Ps.StateP [T.Text] p () (Maybe T.Text) b' b m
-         (Either ParsingError r) #-}
+         (Maybe (Either ParsingError r)) #-}
