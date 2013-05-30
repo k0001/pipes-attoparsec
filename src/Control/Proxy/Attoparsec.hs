@@ -3,7 +3,7 @@
 -- package, so the functionality exported by that package can be reused here.
 
 module Control.Proxy.Attoparsec
-  ( -- * Interleaved parsing
+  ( -- * Parsing
     parseD
   , maybeParseD
   , eitherParseD
@@ -32,7 +32,6 @@ import           Prelude                           hiding (mapM_)
 -- In case of parsing errors, a 'ParsingError' exception is thrown in the
 -- 'Pe.EitherP' proxy transformer.
 --
-
 -- Requests more input from upstream using 'Pa.draw', when needed.
 parseD
   :: (ParserInput a, Monad m, P.Proxy p)
