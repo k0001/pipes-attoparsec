@@ -44,7 +44,6 @@ parseD parser = \() -> do
     case er of
       Left e  -> Pe.throw e
       Right r -> return r
-{-# INLINABLE parseD #-}
 {-# SPECIALIZE parseD
       :: (Monad m, P.Proxy p) => Parser B.ByteString r -> ()
       -> Pe.EitherP ParsingError (Ps.StateP [B.ByteString] p)
@@ -70,7 +69,6 @@ maybeParseD parser = \() -> do
     case er of
       Left _  -> return Nothing
       Right r -> return (Just r)
-{-# INLINABLE maybeParseD #-}
 {-# SPECIALIZE maybeParseD
     :: (Monad m, P.Proxy p) => Parser B.ByteString r -> ()
     -> Ps.StateP [B.ByteString] p () (Maybe B.ByteString) b' b m (Maybe r) #-}
@@ -92,7 +90,6 @@ eitherParseD parser = \() -> do
     (er,mlo) <- I.parseWithMay Pa.draw parser
     mapM_ Pa.unDraw mlo
     return er
-{-# INLINABLE eitherParseD #-}
 {-# SPECIALIZE eitherParseD
       :: (Monad m, P.Proxy p) => Parser B.ByteString r -> ()
       -> Ps.StateP [B.ByteString] p () (Maybe B.ByteString) b' b m
