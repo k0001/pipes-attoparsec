@@ -27,6 +27,7 @@ import           Prelude                           hiding (mapM_)
 --------------------------------------------------------------------------------
 
 -- | Parses input flowing downstream until parsing either succeeds or fails.
+-- Returns 'Nothing' on EOF.
 --
 -- In case of parsing errors, a 'ParsingError' exception is thrown in the
 -- 'Pe.EitherP' proxy transformer.
@@ -58,7 +59,7 @@ parseD parser = \() -> do
 
 
 -- | Try to parse input flowing downstream, return 'Left' in case of parsing
--- failures.
+-- failures. Returns 'Nothing' on EOF.
 --
 -- Requests more input from upstream using 'Pa.draw', when needed.
 eitherParseD
