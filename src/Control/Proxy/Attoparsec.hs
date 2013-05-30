@@ -32,9 +32,10 @@ import           Prelude                           hiding (mapM_)
 -- In case of parsing errors, a 'ParsingError' exception is thrown in the
 -- 'Pe.EitherP' proxy transformer.
 --
+
 -- Requests more input from upstream using 'Pa.draw', when needed.
 parseD
-  :: (I.AttoparsecInput a, Monad m, P.Proxy p)
+  :: (ParserInput a, Monad m, P.Proxy p)
   => Parser a r
   -> ()
   -> Pe.EitherP ParsingError (Ps.StateP [a] p) () (Maybe a) b' b m r
@@ -60,7 +61,7 @@ parseD parser = \() -> do
 --
 -- Requests more input from upstream using 'Pa.draw', when needed.
 maybeParseD
-  :: (I.AttoparsecInput a, Monad m, P.Proxy p)
+  :: (ParserInput a, Monad m, P.Proxy p)
   => Parser a r
   -> ()
   -> Ps.StateP [a] p () (Maybe a) b' b m (Maybe r)
@@ -84,7 +85,7 @@ maybeParseD parser = \() -> do
 --
 -- Requests more input from upstream using 'Pa.draw', when needed.
 eitherParseD
-  :: (I.AttoparsecInput a, Monad m, P.Proxy p)
+  :: (ParserInput a, Monad m, P.Proxy p)
   => Parser a r
   -> ()
   -> Ps.StateP [a] p () (Maybe a) b' b m (Either ParsingError r)

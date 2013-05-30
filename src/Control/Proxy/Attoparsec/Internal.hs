@@ -6,45 +6,23 @@
 -- Use the "Control.Proxy.Attoparsec" modules instead.
 
 module Control.Proxy.Attoparsec.Internal
-  ( AttoparsecInput(..)
-  , parseWith
+  ( parseWith
   , parseWithMay
   , mayInput
   ) where
 
 --------------------------------------------------------------------------------
 
-import qualified Data.Attoparsec.ByteString        as AB
-import qualified Data.Attoparsec.Text              as AT
-import           Data.Attoparsec.Types             (Parser, IResult(..))
-import qualified Data.ByteString                   as B
-import qualified Data.Text                         as T
-import           Prelude                           hiding (null)
-import           Data.Monoid                       (Monoid, mempty )
-import           Control.Proxy.Attoparsec.Types
-
---------------------------------------------------------------------------------
-
--- | A class for valid Attoparsec input types: 'T.Text' and 'B.ByteString'.
-class (Monoid a, Eq a) => AttoparsecInput a where
-    -- | Run a 'Parser' with input @a@.
-    parse :: Parser a b -> a -> IResult a b
-    -- | Tests whether @a@ is empty.
-    null :: a -> Bool
-
-instance AttoparsecInput B.ByteString where
-    parse   = AB.parse
-    null    = B.null
-
-instance AttoparsecInput T.Text where
-    parse   = AT.parse
-    null    = T.null
+import Data.Attoparsec.Types             (Parser, IResult(..))
+import Prelude                           hiding (null)
+import Data.Monoid                       (mempty)
+import Control.Proxy.Attoparsec.Types    (ParserInput(..), ParsingError(..))
 
 --------------------------------------------------------------------------------
 
 -- | Run a parser drawing input from the given monadic action as needed.
 parseWith
-  :: (Monad m, AttoparsecInput a)
+  :: (Monad m, ParserInput a)
   => m a
   -- ^ An action that will be executed to provide the parser with more input
   -- as needed. If the action returns `mempty`, then it's assumed no more
@@ -62,14 +40,15 @@ parseWith refill p = step . parse p =<< refill where
 
 -- | Like 'parseWith', except the given monadic action might return either
 -- `Nothing` or `Just mempty` to signal that no more input is available.
-parseWithMay :: (Monad m, AttoparsecInput a)
+parseWithMay :: (Monad m, ParserInput a)
              => m (Maybe a) -> Parser a b -> m (Either ParsingError b, Maybe a)
 parseWithMay refill p = parseWith (return . maybe mempty id =<< refill) p
 {-# INLINABLE parseWithMay #-}
 
 
 -- | Wrap @a@ in 'Just' if not-null. Otherwise, 'Nothing'.
-mayInput :: AttoparsecInput a => a -> Maybe a
+mayInput :: ParserInput a => a -> Maybe a
 mayInput x | null x    = Nothing
            | otherwise = Just x
 {-# INLINABLE mayInput #-}
+
