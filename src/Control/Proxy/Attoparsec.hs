@@ -25,7 +25,6 @@ import           Prelude                           hiding (mapM_)
 --------------------------------------------------------------------------------
 
 -- | Parses input flowing downstream until parsing either succeeds or fails.
--- Returns 'Nothing' on EOF.
 --
 -- In case of parsing errors, a 'ParsingError' exception is thrown in the
 -- 'Pe.EitherP' proxy transformer.
@@ -35,35 +34,25 @@ parseD
   :: (ParserInput a, Monad m, P.Proxy p)
   => Parser a r
   -> ()
-  -> Pe.EitherP ParsingError (Ps.StateP [a] p) () (Maybe a) b' b m (Maybe r)
+  -> Pe.EitherP ParsingError (Ps.StateP [a] p) () (Maybe a) b' b m r
 parseD parser = \() -> do
-    eof <- P.liftP $ Pa.isEndOfInput
-    if eof
-      then return Nothing
-      else do
-        (er, mlo) <- P.liftP $ I.parseWith Pa.draw parser
-        P.liftP $ mapM_ Pa.unDraw mlo
-        case er of
-          Left e  -> Pe.throw e
-          Right r -> return (Just r)
+    (er, mlo) <- P.liftP $ I.parseWith Pa.draw parser
+    P.liftP $ mapM_ Pa.unDraw mlo
+    either Pe.throw return er
 {-# INLINABLE parseD #-}
 
 
 -- | Try to parse input flowing downstream, return 'Left' in case of parsing
--- failures. Returns 'Nothing' on EOF.
+-- failures.
 --
 -- Requests more input from upstream using 'Pa.draw', when needed.
 eitherParseD
   :: (ParserInput a, Monad m, P.Proxy p)
   => Parser a r
   -> ()
-  -> Ps.StateP [a] p () (Maybe a) b' b m (Maybe (Either ParsingError r))
+  -> Ps.StateP [a] p () (Maybe a) b' b m (Either ParsingError r)
 eitherParseD parser = \() -> do
-    eof <- Pa.isEndOfInput
-    if eof
-      then return Nothing
-      else do
-        (er,mlo) <- I.parseWith Pa.draw parser
-        mapM_ Pa.unDraw mlo
-        return (Just er)
+    (er,mlo) <- I.parseWith Pa.draw parser
+    mapM_ Pa.unDraw mlo
+    return er
 {-# INLINABLE eitherParseD #-}
