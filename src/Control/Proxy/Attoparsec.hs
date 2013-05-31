@@ -19,9 +19,7 @@ import           Control.Proxy.Attoparsec.Types
 import qualified Control.Proxy.Trans.Either        as Pe (EitherP, throw)
 import qualified Control.Proxy.Trans.State         as Ps (StateP)
 import           Data.Attoparsec.Types             (Parser)
-import qualified Data.ByteString                   as B
 import           Data.Foldable                     (mapM_)
-import qualified Data.Text                         as T
 import           Prelude                           hiding (mapM_)
 
 --------------------------------------------------------------------------------
@@ -43,19 +41,12 @@ parseD parser = \() -> do
     if eof
       then return Nothing
       else do
-        (er, mlo) <- P.liftP $ I.parseWithMay Pa.draw parser
+        (er, mlo) <- P.liftP $ I.parseWith Pa.draw parser
         P.liftP $ mapM_ Pa.unDraw mlo
         case er of
           Left e  -> Pe.throw e
           Right r -> return (Just r)
-{-# SPECIALIZE parseD
-      :: (Monad m, P.Proxy p) => Parser B.ByteString r -> ()
-      -> Pe.EitherP ParsingError (Ps.StateP [B.ByteString] p)
-         () (Maybe B.ByteString) b' b m (Maybe r) #-}
-{-# SPECIALIZE parseD
-      :: (Monad m, P.Proxy p) => Parser T.Text r -> ()
-      -> Pe.EitherP ParsingError (Ps.StateP [T.Text] p)
-         () (Maybe T.Text) b' b m (Maybe r) #-}
+{-# INLINABLE parseD #-}
 
 
 -- | Try to parse input flowing downstream, return 'Left' in case of parsing
@@ -72,14 +63,7 @@ eitherParseD parser = \() -> do
     if eof
       then return Nothing
       else do
-        (er,mlo) <- I.parseWithMay Pa.draw parser
+        (er,mlo) <- I.parseWith Pa.draw parser
         mapM_ Pa.unDraw mlo
         return (Just er)
-{-# SPECIALIZE eitherParseD
-      :: (Monad m, P.Proxy p) => Parser B.ByteString r -> ()
-      -> Ps.StateP [B.ByteString] p () (Maybe B.ByteString) b' b m
-         (Maybe (Either ParsingError r)) #-}
-{-# SPECIALIZE eitherParseD
-      :: (Monad m, P.Proxy p) => Parser T.Text r -> ()
-      -> Ps.StateP [T.Text] p () (Maybe T.Text) b' b m
-         (Maybe (Either ParsingError r)) #-}
+{-# INLINABLE eitherParseD #-}
