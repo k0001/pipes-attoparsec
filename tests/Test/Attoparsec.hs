@@ -1,35 +1,48 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 module Test.Attoparsec (tests) where
 
+import           Data.Function                  (fix)
 import           Control.Monad
 import           Control.Proxy                  ((>->))
 import qualified Control.Proxy                  as P
-import qualified Control.Proxy.Trans.Attoparsec as PA
-import           Data.Attoparsec.Text           as AT
+import qualified Control.Proxy.Trans.State      as P
+import qualified Control.Proxy.Trans.Either     as P
+import qualified Control.Proxy.Trans.Writer     as P
+import qualified Control.Proxy.Parse            as Pa
+import           Control.Proxy.Attoparsec       (parseD, ParsingError)
+import qualified Data.Attoparsec.Text           as AT
 import qualified Data.Text                      as T
 import           Data.Maybe
 import           Test.Framework.Providers.HUnit (testCase)
-import           Test.HUnit
+import           Test.HUnit                     (Assertion, assert)
 
 -- | Parses a 'Char' repeated four times.
 four :: AT.Parser Char
 four = do
    c <- AT.anyChar
-   replicateM_ 3 $ char c
+   replicateM_ 3 $ AT.char c
    return c
 
-
-pfours :: (Monad m, P.Proxy p) => () -> P.Pipe (PA.AttoparsecP T.Text p) T.Text Char m r
-pfours () = forever $ P.respond =<< PA.parseD four
+type ParseTest = (Bool, String, [T.Text], [Char], [T.Text])
 
 
-type ParseTest = (Bool, String, [T.Text], [Char], Maybe T.Text)
+loopD :: (Monad m, P.Proxy p)
+      => () -> P.EitherP ParsingError (P.StateP [T.Text] (P.WriterP [Char] p))
+               () (Maybe T.Text) b' b m ()
+loopD () = fix $ \loop -> do
+    x <- parseD four ()
+    P.liftP . P.liftP $ P.tell [x]
+    eof <- P.liftP $ Pa.isEndOfInput
+    unless eof loop
+
 
 assertFoursTest :: ParseTest -> Assertion
-assertFoursTest (ok, _, input, output, mlo) = assert . fromJust $ do
-  let sess = PA.runParseK Nothing $ P.fromListS input >-> pfours
-  ((epe,mlo'), res) <- P.runWriterT . P.runProxy $ sess >-> P.toListD
+assertFoursTest (ok, _title, input, output, mlo) = assert . fromJust $ do
+  let srcS = (Pa.wrap.) $ P.fromListS input
+      run = P.runProxy . P.runWriterK . P.runStateK Pa.mempty . P.runEitherK
+  ((epe,mlo'), res) <- run $ srcS >-> loopD
   let okMlo = mlo' == mlo
       okErr = either (const $ not ok) (const $ ok) epe
       okRes = res == output
@@ -37,46 +50,27 @@ assertFoursTest (ok, _, input, output, mlo) = assert . fromJust $ do
 
 foursTests :: [ParseTest]
 foursTests =
-  [ (True  ,"0 chunk"                 ,[]              ,[]        ,Nothing)
-  , (True  ,"1 chunk: Empty"          ,[""]            ,[]        ,Nothing)
-  -- ^XXX I'm not sure if this is the desired behavior.
-  , (True  ,"1 chunk: One"            ,["aaaa"]        ,['a']     ,Nothing)
-  , (True  ,"1 chunk: One twice"      ,["aaaaaaaa"]    ,['a','a'] ,Nothing)
-  , (True  ,"1 chunk: Two"            ,["aaaabbbb"]    ,['a','b'] ,Nothing)
-  , (True  ,"1 chunk: Partial"        ,["aaaab"]       ,['a']     ,Nothing)
-  , (False ,"1 chunk: Wrong"          ,["aaxbb"]       ,[]        ,Just "xbb")
-  , (False ,"1 chunk: One then wrong" ,["aaaavz"]      ,['a']     ,Just "z")
-  , (False ,"2 chunk: Empty"          ,["",""]         ,[]        ,Nothing)
+  [ (False ,"0 chunk"                 ,[]              ,[]        ,[])
+  , (False ,"1 chunk: Empty"          ,[]              ,[]        ,[])
+  , (True  ,"1 chunk: One"            ,["aaaa"]        ,['a']     ,[])
+  , (True  ,"1 chunk: One twice"      ,["aaaaaaaa"]    ,['a','a'] ,[])
+  , (True  ,"1 chunk: Two"            ,["aaaabbbb"]    ,['a','b'] ,[])
+  , (False ,"1 chunk: Partial"        ,["aaaab"]       ,['a']     ,[])
+  , (False ,"1 chunk: Wrong"          ,["aaxbb"]       ,[]        ,["xbb"])
+  , (False ,"1 chunk: One then wrong" ,["aaaavz"]      ,['a']     ,["z"])
+  , (False ,"2 chunk: Empty"          ,["",""]         ,[]        ,[])
   -- ^Fails cuz those two empty strings are feeded directly to the Parser.
-  , (True  ,"2 chunk: One"            ,["a","aaa"]     ,['a']     ,Nothing)
-  , (True  ,"2 chunk: One'"           ,["aa","aa"]     ,['a']     ,Nothing)
-  , (True  ,"2 chunk: One''"          ,["aaa","a"]     ,['a']     ,Nothing)
-  , (True  ,"2 chunk: One'''"         ,["aaaa",""]     ,['a']     ,Nothing)
-  , (True  ,"2 chunk: Two"            ,["aaaa","bbbb"] ,['a','b'] ,Nothing)
-  , (False ,"2 chunk: Wrong"          ,["abcd","efgh"] ,[]        ,Just "bcd")
-  , (False ,"2 chunk: One then wrong" ,["aaaab","bxz"] ,['a']     ,Just "xz")
-  , (True  ,"3 chunk: One"            ,["a","a","aa"]  ,['a']     ,Nothing)
+  , (True  ,"2 chunk: One"            ,["a","aaa"]     ,['a']     ,[])
+  , (True  ,"2 chunk: One'"           ,["aa","aa"]     ,['a']     ,[])
+  , (True  ,"2 chunk: One''"          ,["aaa","a"]     ,['a']     ,[])
+  , (False ,"2 chunk: One'''"         ,["aaaa",""]     ,['a']     ,[])
+  , (True  ,"2 chunk: Two"            ,["aaaa","bbbb"] ,['a','b'] ,[])
+  , (False ,"2 chunk: Wrong"          ,["abcd","efgh"] ,[]        ,["bcd"])
+  , (False ,"2 chunk: One then wrong" ,["aaaab","bxz"] ,['a']     ,["xz"])
+  , (True  ,"3 chunk: One"            ,["a","a","aa"]  ,['a']     ,[])
   ]
 
--- testCaseFoursTest :: ParseTest -> Test
 testCaseFoursTest ft@(_,name,_,_,_) =
   testCase ("Fours." ++ name) $ assertFoursTest ft
 
-
-assertParseUsesLeftovers :: ParseTest -> Assertion
-assertParseUsesLeftovers (ok, _, input, output, mlo) = assert . fromJust $ do
-  let pmulti () = replicateM_ 2 $ PA.parseD four >>= P.respond
-  let sess = PA.runParseK Nothing $ P.fromListS input >-> pmulti
-  ((epe,mlo'), res) <- P.runWriterT . P.runProxy $ sess >-> P.toListD
-  let okMlo = mlo' == mlo
-      okErr = either (const $ not ok) (const $ ok) epe
-      okRes = res == output
-  return $ okMlo && okErr && okRes
-
--- testCaseReuseLeftovers :: ParseTest -> Test
-testCaseReuseLeftovers ft@(_,name,_,_,_) =
-  testCase ("Reuse." ++ name) $ assertParseUsesLeftovers ft
-
-
-tests = (map testCaseFoursTest      foursTests)
-     ++ (map testCaseReuseLeftovers foursTests)
+tests = map testCaseFoursTest foursTests
