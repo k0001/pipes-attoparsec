@@ -5,8 +5,6 @@
 module Control.Proxy.Attoparsec
   ( -- * Parsing
     parseD
-  , eitherParseD
-    -- * Exports
   , module Control.Proxy.Attoparsec.Types
   ) where
 
@@ -16,8 +14,8 @@ import qualified Control.Proxy                     as P
 import qualified Control.Proxy.Parse               as Pa
 import qualified Control.Proxy.Attoparsec.Internal as I
 import           Control.Proxy.Attoparsec.Types
-import qualified Control.Proxy.Trans.Either        as Pe (EitherP, throw)
-import qualified Control.Proxy.Trans.State         as Ps (StateP)
+import qualified Control.Proxy.Trans.Either        as Pe
+import qualified Control.Proxy.Trans.State         as Ps
 import           Data.Attoparsec.Types             (Parser)
 import           Data.Foldable                     (mapM_)
 import           Prelude                           hiding (mapM_)
@@ -36,23 +34,8 @@ parseD
   -> ()
   -> Pe.EitherP ParsingError (Ps.StateP [a] p) () (Maybe a) b' b m r
 parseD parser = \() -> do
-    (er, mlo) <- P.liftP $ I.parseWith Pa.draw parser
-    P.liftP $ mapM_ Pa.unDraw mlo
+    (er, mlo) <- P.liftP (I.parseWith Pa.draw parser)
+    P.liftP (mapM_ Pa.unDraw mlo)
     either Pe.throw return er
 {-# INLINABLE parseD #-}
 
-
--- | Try to parse input flowing downstream, return 'Left' in case of parsing
--- failures.
---
--- Requests more input from upstream using 'Pa.draw', when needed.
-eitherParseD
-  :: (ParserInput a, Monad m, P.Proxy p)
-  => Parser a r
-  -> ()
-  -> Ps.StateP [a] p () (Maybe a) b' b m (Either ParsingError r)
-eitherParseD parser = \() -> do
-    (er,mlo) <- I.parseWith Pa.draw parser
-    mapM_ Pa.unDraw mlo
-    return er
-{-# INLINABLE eitherParseD #-}
