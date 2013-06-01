@@ -11,7 +11,7 @@ import qualified Control.Proxy.Trans.State      as P
 import qualified Control.Proxy.Trans.Either     as P
 import qualified Control.Proxy.Trans.Writer     as P
 import qualified Control.Proxy.Parse            as Pa
-import           Control.Proxy.Attoparsec       (parseD, ParsingError)
+import           Control.Proxy.Attoparsec       (parse, ParsingError)
 import qualified Data.Attoparsec.Text           as AT
 import qualified Data.Text                      as T
 import           Data.Maybe
@@ -32,7 +32,7 @@ loopD :: (Monad m, P.Proxy p)
       => () -> P.EitherP ParsingError (P.StateP [T.Text] (P.WriterP [Char] p))
                () (Maybe T.Text) b' b m ()
 loopD () = fix $ \loop -> do
-    x <- parseD four ()
+    x <- parse four ()
     P.liftP . P.liftP $ P.tell [x]
     eof <- P.liftP $ Pa.isEndOfInput
     unless eof loop

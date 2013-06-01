@@ -4,7 +4,7 @@
 
 module Control.Proxy.Attoparsec
   ( -- * Parsing
-    parseD
+    parse
   , module Control.Proxy.Attoparsec.Types
   ) where
 
@@ -13,7 +13,7 @@ module Control.Proxy.Attoparsec
 import qualified Control.Proxy                     as P
 import qualified Control.Proxy.Parse               as Pa
 import qualified Control.Proxy.Attoparsec.Internal as I
-import           Control.Proxy.Attoparsec.Types
+import           Control.Proxy.Attoparsec.Types    (ParserInput, ParsingError)
 import qualified Control.Proxy.Trans.Either        as Pe
 import qualified Control.Proxy.Trans.State         as Ps
 import           Data.Attoparsec.Types             (Parser)
@@ -28,14 +28,14 @@ import           Prelude                           hiding (mapM_)
 -- 'Pe.EitherP' proxy transformer.
 --
 -- Requests more input from upstream using 'Pa.draw', when needed.
-parseD
+parse
   :: (ParserInput a, Monad m, P.Proxy p)
   => Parser a r
   -> ()
-  -> Pe.EitherP ParsingError (Ps.StateP [a] p) () (Maybe a) b' b m r
-parseD parser = \() -> do
+  -> Pe.EitherP ParsingError (Ps.StateP [a] p) () (Maybe a) y' y m r
+parse parser = \() -> do
     (er, mlo) <- P.liftP (I.parseWith Pa.draw parser)
     P.liftP (mapM_ Pa.unDraw mlo)
     either Pe.throw return er
-{-# INLINABLE parseD #-}
+{-# INLINABLE parse #-}
 
