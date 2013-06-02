@@ -1,22 +1,60 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 -- | This module provides low-level integration with Attoparsec and is likely
 -- to be modified in backwards-incompatible ways in the future.
 --
 -- Use the "Control.Proxy.Attoparsec" module instead.
 
 module Control.Proxy.Attoparsec.Internal
-  ( parseWith
+  ( -- * Types
+    ParsingError(..)
+  , ParserInput(..)
+    -- * Parsing
+  , parseWith
   , parseWithMay
   , parseWithMayNoNullCheck
+    -- * Utils
   , mayInput
   ) where
 
 --------------------------------------------------------------------------------
 
-import Data.Attoparsec.Types             (Parser, IResult(..))
-import Prelude                           hiding (null)
-import Data.Function                     (fix)
-import Data.Monoid                       (mempty)
-import Control.Proxy.Attoparsec.Types    (ParserInput(..), ParsingError(..))
+import           Control.Exception                 (Exception)
+import           Data.Attoparsec.Types             (Parser, IResult(..))
+import qualified Data.Attoparsec.ByteString        as AB (parse)
+import qualified Data.Attoparsec.Text              as AT (parse)
+import qualified Data.ByteString                   as B (ByteString, null)
+import           Data.Data                         (Data, Typeable)
+import           Data.Function                     (fix)
+import           Data.Monoid                       (Monoid(mempty))
+import qualified Data.Text                         as T (Text, null)
+import           Prelude                           hiding (null)
+
+--------------------------------------------------------------------------------
+
+data ParsingError = ParsingError
+  { peContexts :: [String]  -- ^ Contexts where the parsing error occurred.
+  , peMessage  :: String    -- ^ Parsing error description message.
+  } deriving (Show, Eq, Data, Typeable)
+
+instance Exception ParsingError where
+
+--------------------------------------------------------------------------------
+
+-- | A class for valid Attoparsec input types: 'T.Text' and 'B.ByteString'.
+class (Monoid a) => ParserInput a where
+    -- | Run a 'Parser' with input @a@.
+    parse :: Parser a b -> a -> IResult a b
+    -- | Tests whether @a@ is empty.
+    null :: a -> Bool
+
+instance ParserInput B.ByteString where
+    parse   = AB.parse
+    null    = B.null
+
+instance ParserInput T.Text where
+    parse   = AT.parse
+    null    = T.null
 
 --------------------------------------------------------------------------------
 

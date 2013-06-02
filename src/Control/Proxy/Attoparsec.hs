@@ -10,8 +10,8 @@ module Control.Proxy.Attoparsec
     parseD
   , parse
     -- * Types
-  , T.ParserInput(T.null)
-  , T.ParsingError(..)
+  , I.ParserInput(I.null)
+  , I.ParsingError(..)
   ) where
 
 --------------------------------------------------------------------------------
@@ -20,7 +20,6 @@ import           Control.Monad                     (unless)
 import qualified Control.Proxy                     as P
 import qualified Control.Proxy.Parse               as Pa
 import qualified Control.Proxy.Attoparsec.Internal as I
-import qualified Control.Proxy.Attoparsec.Types    as T
 import qualified Control.Proxy.Trans.Either        as P
 import qualified Control.Proxy.Trans.State         as P
 import           Data.Attoparsec.Types             (Parser)
@@ -31,29 +30,29 @@ import           Prelude                           hiding (mapM_)
 
 -- | Parses one element flowing downstream.
 --
--- In case of parsing errors, including EOF, a 'T.ParsingError' exception is
+-- In case of parsing errors, including EOF, a 'I.ParsingError' exception is
 -- thrown in the 'Pe.EitherP' proxy transformer.
 --
 -- Requests more input from upstream using 'Pa.draw' when needed.
 --
--- 'T.null' input chunks from upstream will cause undesired parsing failures.
--- If you are not sure whether your input stream is free from 'T.null' chunks,
+-- 'I.null' input chunks from upstream will cause undesired parsing failures.
+-- If you are not sure whether your input stream is free from 'I.null' chunks,
 -- you can use 'P.filterD' upstream:
 --
 -- @
--- 'P.filterD' ('not' . 'T.null') 'P.>->' 'parse' ...
+-- 'P.filterD' ('not' . 'I.null') 'P.>->' 'parse' ...
 -- @
 --
 -- This proxy is meant to be composed in the 'P.request' category.
 
--- In case you wonder, skipping 'T.null' inputs manually below wouldn't help if
--- we were trying to parse the tail of the stream and there were just 'T.null'
+-- In case you wonder, skipping 'I.null' inputs manually below wouldn't help if
+-- we were trying to parse the tail of the stream and there were just 'I.null'
 -- inputs left. That's why we just recommend using
--- @'P.filterD' ('not' . 'T.null')@ upstream, which gives the optimal behavior.
+-- @'P.filterD' ('not' . 'I.null')@ upstream, which gives the optimal behavior.
 parse
-  :: (T.ParserInput a, Monad m, P.Proxy p)
+  :: (I.ParserInput a, Monad m, P.Proxy p)
   => Parser a r
-  -> () -> P.EitherP T.ParsingError (P.StateP [a] p) () (Maybe a) y' y m r
+  -> () -> P.EitherP I.ParsingError (P.StateP [a] p) () (Maybe a) y' y m r
 parse parser = \() -> do
     (er, mlo) <- P.liftP (I.parseWithMayNoNullCheck Pa.draw parser)
     P.liftP (mapM_ Pa.unDraw mlo)
@@ -63,24 +62,24 @@ parse parser = \() -> do
 
 -- | Parses elements flowing downstream until EOF.
 --
--- In case of parsing errors, a 'T.ParsingError' exception is thrown in the
+-- In case of parsing errors, a 'I.ParsingError' exception is thrown in the
 -- 'Pe.EitherP' proxy transformer.
 --
 -- Requests more input from upstream using 'Pa.draw', when needed.
 --
--- 'T.null' input chunks from upstream will cause undesired parsing failures.
--- If you are not sure whether your input stream is free from 'T.null' chunks,
+-- 'I.null' input chunks from upstream will cause undesired parsing failures.
+-- If you are not sure whether your input stream is free from 'I.null' chunks,
 -- you can use 'P.filterD' upstream:
 --
 -- @
--- 'P.filterD' ('not' . 'T.null') 'P.>->' 'parseD' ...
+-- 'P.filterD' ('not' . 'I.null') 'P.>->' 'parseD' ...
 -- @
 --
 -- This proxy is meant to be composed in the 'P.pull' category.
 parseD
-  :: (T.ParserInput a, Monad m, P.Proxy p)
+  :: (I.ParserInput a, Monad m, P.Proxy p)
   => Parser a b
-  -> () -> P.Pipe (P.EitherP T.ParsingError (P.StateP [a] p)) (Maybe a) b m ()
+  -> () -> P.Pipe (P.EitherP I.ParsingError (P.StateP [a] p)) (Maybe a) b m ()
 parseD parser = \() -> loop
   where
     loop = do
