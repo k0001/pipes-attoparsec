@@ -34,14 +34,14 @@ import           Prelude                           hiding (mapM_, null)
 -- thrown in the 'Pe.EitherP' proxy transformer.
 --
 -- Requests more input from upstream using 'Pa.draw' when needed. 'null' inputs
--- from upstream may result in parsing errors, you can prevent that kind of
--- errors by using the 'skipNullD' proxy upstream.
+-- from upstream may result in unexpected EOF parsing errors, you can prevent
+-- that kind of errors by using the 'skipNullD' proxy upstream.
 --
 -- This proxy is meant to be composed in the 'P.request' category.
 
--- In case you wonder, using 'I.parseWithMay' below wouldn't help if we were
--- trying to parse the tail of the stream and there are 'null' inputs left.
--- That's why we just recommend using 'skipNullD' upstream.
+-- In case you wonder, skipping 'null' inputs manually below wouldn't help if
+-- we were trying to parse the tail of the stream and there were just 'null'
+-- inputs left. That's why we just recommend using 'skipNullD' upstream.
 parse
   :: (ParserInput a, Monad m, P.Proxy p)
   => Parser a r
