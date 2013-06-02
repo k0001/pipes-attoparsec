@@ -8,7 +8,6 @@ module Control.Proxy.Attoparsec
   , parseD
     -- * Utils
   , skipNullD
-  , drawSkipNull
     -- * Types
   , module Control.Proxy.Attoparsec.Types
   ) where
@@ -35,8 +34,8 @@ import           Prelude                           hiding (mapM_, null)
 -- thrown in the 'Pe.EitherP' proxy transformer.
 --
 -- Requests more input from upstream using 'Pa.draw' when needed. 'null' inputs
--- from upstream will lead to premature EOF, you can prevent that kind of error
--- by using the 'skipNullD' proxy upstream.
+-- from upstream may result in parsing errors, you can prevent that kind of
+-- errors by using the 'skipNullD' proxy upstream.
 --
 -- This proxy is meant to be composed in the 'P.request' category.
 
@@ -81,18 +80,4 @@ parseD parser = Pa.fmapPull skipNullD P.>-> \() -> loop
 skipNullD :: (ParserInput a, Monad m, P.Proxy p) => () -> P.Pipe p a a m ()
 skipNullD = P.filterD (not . null)
 {-# INLINABLE skipNullD #-}
-
-
--- | Like 'Pa.draw', except it skips 'null' 'ParserInput'.
-drawSkipNull
-  :: (ParserInput a, Monad m, P.Proxy p)
-  => P.StateP [a] p () (Maybe a) y' y m (Maybe a)
-drawSkipNull = do
-    ma <- Pa.draw
-    case ma of
-      Just a
-       | null a    -> drawSkipNull
-       | otherwise -> return ma
-      Nothing      -> return Nothing
-{-# INLINABLE drawSkipNull #-}
 
