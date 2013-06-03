@@ -53,9 +53,9 @@ foursTests =
   , (True  ,"2 chunk: One"              ,["a","aaa"]        ,['a']     ,[])
   , (True  ,"2 chunk: One'"             ,["aa","aa"]        ,['a']     ,[])
   , (True  ,"2 chunk: One''"            ,["aaa","a"]        ,['a']     ,[])
-  , (False ,"2 chunk: One'''"           ,["aaaa",""]        ,['a']     ,[])
+  , (True  ,"2 chunk: One'''"           ,["aaaa",""]        ,['a']     ,[])
   , (True  ,"2 chunk: Two"              ,["aaaa","bbbb"]    ,['a','b'] ,[])
-  , (False ,"2 chunk: Wrong"            ,["abcd","efgh"]    ,[]        ,["bcd"])
+  , (False ,"2 chunk: Wrong"            ,["abcd","efgh"]    ,[]        ,["bcd", "efgh"])
   , (False ,"2 chunk: One then wrong"   ,["aaaab","bxz"]    ,['a']     ,["xz"])
   , (True  ,"3 chunk: One"              ,["a","a","aa"]     ,['a']     ,[])
   ]

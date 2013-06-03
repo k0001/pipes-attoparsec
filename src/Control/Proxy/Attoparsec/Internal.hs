@@ -12,7 +12,6 @@ module Control.Proxy.Attoparsec.Internal
     -- * Parsing
   , parseWith
   , parseWithMay
-  , parseWithMayNoNullCheck
     -- * Utils
   , mayInput
   ) where
@@ -25,7 +24,6 @@ import qualified Data.Attoparsec.ByteString        as AB (parse)
 import qualified Data.Attoparsec.Text              as AT (parse)
 import qualified Data.ByteString                   as B (ByteString, null)
 import           Data.Data                         (Data, Typeable)
-import           Data.Function                     (fix)
 import           Data.Monoid                       (Monoid(mempty))
 import qualified Data.Text                         as T (Text, null)
 import           Prelude                           hiding (null)
@@ -87,27 +85,21 @@ parseWithMay
   -- ^Parser to run on the given input
   -> m (Either ParsingError r, Maybe a)
   -- ^Either a parser error or a parsed result, together with any leftover.
-parseWithMay refill = parseWith . fix $ \loop -> do
-    ma <- refill
-    case ma of
-      Just a
-       | null a    -> loop  -- retry on null input
-       | otherwise -> return a
-      Nothing      -> return mempty
+parseWithMay refill p = parseWith loop p
+  where
+    loop = do
+        ma <- refill
+        case ma of
+          Just a
+           | null a    -> loop  -- retry on null input
+           | otherwise -> return a
+          Nothing      -> return mempty
 {-# INLINABLE parseWithMay #-}
-
-
--- | Like 'parseWithMay', except any of 'Nothing' of 'Just mempty' inputs
--- indicate EOF.
-parseWithMayNoNullCheck
-  :: (Monad m, ParserInput a)
-  => m (Maybe a) -> Parser a r -> m (Either ParsingError r, Maybe a)
-parseWithMayNoNullCheck refill = parseWith (return . maybe mempty id =<< refill)
-{-# INLINABLE parseWithMayNoNullCheck #-}
 
 
 -- | Wrap @a@ in 'Just' if not-null. Otherwise, 'Nothing'.
 mayInput :: ParserInput a => a -> Maybe a
 mayInput = \x -> if null x then Nothing else Just x
 {-# INLINABLE mayInput #-}
+
 

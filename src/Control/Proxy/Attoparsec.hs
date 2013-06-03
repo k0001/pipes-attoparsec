@@ -10,7 +10,7 @@ module Control.Proxy.Attoparsec
     parseD
   , parse
     -- * Types
-  , I.ParserInput(I.null)
+  , I.ParserInput
   , I.ParsingError(..)
   ) where
 
@@ -33,29 +33,17 @@ import           Prelude                           hiding (mapM_)
 -- In case of parsing errors, including EOF, a 'I.ParsingError' exception is
 -- thrown in the 'Pe.EitherP' proxy transformer.
 --
--- Requests more input from upstream using 'Pa.draw' when needed.
---
--- 'I.null' input chunks from upstream will cause undesired parsing failures.
--- If you are not sure whether your input stream is free from 'I.null' chunks,
--- you can use 'P.filterD' upstream:
---
--- @
--- 'P.filterD' ('not' . 'I.null') 'P.>->' 'parse' ...
--- @
+-- Requests more input from upstream using 'Pa.draw' when needed. Empty input
+-- chunks from upstream will be eagerly consumed and discarded.
 --
 -- This proxy is meant to be composed in the 'P.request' category.
-
--- In case you wonder, skipping 'I.null' inputs manually below wouldn't help if
--- we were trying to parse the tail of the stream and there were just 'I.null'
--- inputs left. That's why we just recommend using
--- @'P.filterD' ('not' . 'I.null')@ upstream, which gives the optimal behavior.
 parse
   :: (I.ParserInput a, Monad m, P.Proxy p)
   => Parser a r
   -> () -> P.EitherP I.ParsingError (P.StateP [a] p) () (Maybe a) y' y m r
 parse parser = \() -> do
-    (er, mlo) <- P.liftP (I.parseWithMayNoNullCheck Pa.draw parser)
-    P.liftP (mapM_ Pa.unDraw mlo)
+    (er, mlo) <- P.liftP (I.parseWithMay Pa.draw parser)
+    P.liftP $ dropNulls >> mapM_ Pa.unDraw mlo
     either P.throw return er
 {-# INLINABLE parse #-}
 
@@ -65,15 +53,8 @@ parse parser = \() -> do
 -- In case of parsing errors, a 'I.ParsingError' exception is thrown in the
 -- 'Pe.EitherP' proxy transformer.
 --
--- Requests more input from upstream using 'Pa.draw', when needed.
---
--- 'I.null' input chunks from upstream will cause undesired parsing failures.
--- If you are not sure whether your input stream is free from 'I.null' chunks,
--- you can use 'P.filterD' upstream:
---
--- @
--- 'P.filterD' ('not' . 'I.null') 'P.>->' 'parseD' ...
--- @
+-- Requests more input from upstream using 'Pa.draw', when needed. Empty input
+-- chunks from upstream will be eagerly consumed and discarded.
 --
 -- This proxy is meant to be composed in the 'P.pull' category.
 parseD
@@ -85,7 +66,22 @@ parseD parser = \() -> loop
     loop = do
         eof <- P.liftP Pa.isEndOfInput
         unless eof $ do
-          () <- P.respond =<< parse parser ()
-          loop
+            () <- P.respond =<< parse parser ()
+            loop
 {-# INLINABLE parseD #-}
 
+
+-- | Consume and discard all leading 'I.null' input chunks.
+--
+-- > dropNulls = (Pa.passWhile I.null P.>-> P.evalStateK Pa.mempty Pa.skipAll) ()
+dropNulls
+  :: (I.ParserInput a, Monad m, P.Proxy p)
+  => P.StateP [a] p () (Maybe a) y' y m ()
+dropNulls = do
+    ma <- Pa.draw
+    case ma of
+      Just a
+       | I.null a  -> dropNulls
+       | otherwise -> Pa.unDraw a
+      Nothing      -> return ()
+{-# INLINE dropNulls #-}
