@@ -30,6 +30,7 @@ import           Prelude                           hiding (null)
 
 --------------------------------------------------------------------------------
 
+-- | A parsing error report, as provided by Attoparsec's 'Fail'.
 data ParsingError = ParsingError
   { peContexts :: [String]  -- ^ Contexts where the parsing error occurred.
   , peMessage  :: String    -- ^ Parsing error description message.

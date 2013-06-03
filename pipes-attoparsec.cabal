@@ -30,7 +30,7 @@ library
                    Control.Proxy.Attoparsec.Internal
   build-depends:
       base         (==4.*)
-    , mmorph       (>=1.0 && <1.1)
+--    , mmorph       (>=1.0 && <1.1)
     , pipes        (>=3.3 && <3.4)
     , pipes-parse  (>=1.0 && <1.1)
     , attoparsec   (>=0.10 && <0.11)
