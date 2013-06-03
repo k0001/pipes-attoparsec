@@ -49,7 +49,7 @@ foursTests =
   , (False ,"1 chunk: Partial"          ,["aaaab"]          ,['a']     ,[])
   , (False ,"1 chunk: Wrong"            ,["aaxbb"]          ,[]        ,["xbb"])
   , (False ,"1 chunk: One then wrong"   ,["aaaavz"]         ,['a']     ,["z"])
-  , (False ,"2 chunk: Empty"            ,["",""]            ,[]        ,[])
+  , (True  ,"2 chunk: Empty"            ,["",""]            ,[]        ,[])
   , (True  ,"2 chunk: Empty then one"   ,["","aaaa"]        ,['a']     ,[])
   , (True  ,"2 chunk: One"              ,["a","aaa"]        ,['a']     ,[])
   , (True  ,"2 chunk: One'"             ,["aa","aa"]        ,['a']     ,[])
