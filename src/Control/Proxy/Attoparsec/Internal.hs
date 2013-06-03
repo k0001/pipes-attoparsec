@@ -12,6 +12,7 @@ module Control.Proxy.Attoparsec.Internal
     -- * Parsing
   , parseWith
   , parseWithMay
+  , parseWithMayNoNullCheck
     -- * Utils
   , mayInput
   ) where
@@ -80,7 +81,7 @@ parseWithMay
   => m (Maybe a)
   -- ^An action that will be executed to provide the parser with more input
   -- as needed. If the action returns 'Nothing', then it's assumed no more
-  -- input is available. 'Just mempty' input is discarded.
+  -- input is available. @'Just' 'mempty'@ input is discarded.
   -> Parser a r
   -- ^Parser to run on the given input
   -> m (Either ParsingError r, Maybe a)
@@ -95,6 +96,15 @@ parseWithMay refill p = parseWith loop p
            | otherwise -> return a
           Nothing      -> return mempty
 {-# INLINABLE parseWithMay #-}
+
+
+-- | Like 'parseWithMay' except both 'Nothing' and @'Just' 'mempty'@
+-- indicate end of input.
+parseWithMayNoNullCheck
+  :: (Monad m, ParserInput a) => m (Maybe a) -> Parser a r
+  -> m (Either ParsingError r, Maybe a)
+parseWithMayNoNullCheck refill = parseWith (return . maybe mempty id =<< refill)
+{-# INLINABLE parseWithMayNoNullCheck #-}
 
 
 -- | Wrap @a@ in 'Just' if not-null. Otherwise, 'Nothing'.

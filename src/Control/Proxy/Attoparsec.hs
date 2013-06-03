@@ -30,39 +30,49 @@ import           Prelude                           hiding (mapM_)
 
 -- | Parses one element flowing downstream.
 --
--- In case of parsing errors, including EOF, a 'I.ParsingError' exception is
--- thrown in the 'Pe.EitherP' proxy transformer.
---
--- Requests more input from upstream using 'Pa.draw' when needed. Empty input
--- chunks from upstream will be eagerly consumed and discarded.
---
 -- This proxy is meant to be composed in the 'P.request' category.
+--
+-- In case of parsing errors, a 'I.ParsingError' exception is thrown in
+-- the 'Pe.EitherP' proxy transformer.
+--
+-- Requests more input from upstream using 'Pa.draw' when needed.
+--
+-- /Do not/ use this proxy in streams that contain 'I.null' input chunks,
+-- otherwise you'll get unexpected boundary errors. Instead, filter your
+-- upstream beforehand so that it doesn't contain 'I.null' input chunks,
+-- by using:
+--
+-- @
+-- 'Pa.fmapPull' ('P.filterD' ('not' '.' 'I.null')) >-> ... 'parse' ...
+-- @
 parse
   :: (I.ParserInput a, Monad m, P.Proxy p)
   => Parser a r
   -> () -> P.EitherP I.ParsingError (P.StateP [a] p) () (Maybe a) y' y m r
 parse parser = \() -> do
-    (er, mlo) <- P.liftP (I.parseWithMay Pa.draw parser)
-    P.liftP $ dropNulls >> mapM_ Pa.unDraw mlo
+    (er, mlo) <- P.liftP (I.parseWithMayNoNullCheck Pa.draw parser)
+    P.liftP $ mapM_ Pa.unDraw mlo
     either P.throw return er
 {-# INLINABLE parse #-}
 
 
--- | Parses elements flowing downstream until EOF.
+-- | Parses elements flowing downstream until 'Pa.isEndOfInput'.
+--
+-- This proxy is meant to be composed in the 'P.pull' category.
 --
 -- In case of parsing errors, a 'I.ParsingError' exception is thrown in the
 -- 'Pe.EitherP' proxy transformer.
 --
--- Requests more input from upstream using 'Pa.draw', when needed. Empty input
--- chunks from upstream will be eagerly consumed and discarded.
+-- Requests more input from upstream using 'Pa.draw' when needed.
 --
--- This proxy is meant to be composed in the 'P.pull' category.
+-- Empty input chunks flowing downstream will be discarded.
 parseD
   :: (I.ParserInput a, Monad m, P.Proxy p)
   => Parser a b
   -> () -> P.Pipe (P.EitherP I.ParsingError (P.StateP [a] p)) (Maybe a) b m ()
-parseD parser = \() -> loop
+parseD parser = skipNullsD P.>-> \() -> loop
   where
+    skipNullsD = Pa.fmapPull $ P.filterD (not . I.null)
     loop = do
         eof <- P.liftP Pa.isEndOfInput
         unless eof $ do
@@ -71,17 +81,3 @@ parseD parser = \() -> loop
 {-# INLINABLE parseD #-}
 
 
--- | Consume and discard all leading 'I.null' input chunks.
---
--- > dropNulls = (Pa.passWhile I.null P.>-> P.evalStateK Pa.mempty Pa.skipAll) ()
-dropNulls
-  :: (I.ParserInput a, Monad m, P.Proxy p)
-  => P.StateP [a] p () (Maybe a) y' y m ()
-dropNulls = do
-    ma <- Pa.draw
-    case ma of
-      Just a
-       | I.null a  -> dropNulls
-       | otherwise -> Pa.unDraw a
-      Nothing      -> return ()
-{-# INLINE dropNulls #-}
