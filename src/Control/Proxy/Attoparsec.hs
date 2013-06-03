@@ -10,11 +10,13 @@ module Control.Proxy.Attoparsec
     -- $parsing
     parseD
   , parse
-    -- * Utils
-  , isEndOfParserInput
     -- * Types
   , I.ParserInput
   , I.ParsingError(..)
+    -- * Utils
+  , skipParseD
+  , isEndOfParserInput
+  , isEndOfUsefulParserInput
   ) where
 
 --------------------------------------------------------------------------------
@@ -33,10 +35,10 @@ import           Prelude                           hiding (mapM_)
 --------------------------------------------------------------------------------
 -- $parsing
 --
--- There are two parsing facilities exported by this module, and choosing
--- between them is easy: If you need to interleave Attoparsec parsing with other
--- stream effects you must use 'parse', otherwise you may use the simpler
--- 'parseD'.
+-- There are three different parsing facilities exported by this module, and
+-- choosing between them is easy: If you need to interleave Attoparsec parsing
+-- with other stream effects you must use 'parse', otherwise you may use the
+-- simpler 'parseD'.
 --
 -- These proxies use the 'P.EitherP' proxy transformer to report parsing errors,
 -- you might use any of the facilities exported by "Control.Proxy.Trans.Either"
@@ -90,6 +92,9 @@ parse parser = do
 -- * Requests more input from upstream using 'Pa.draw' when needed.
 --
 -- * Empty input chunks flowing downstream will be discarded.
+--
+-- Sometimes you might need to skip characters such as whitespace in between
+-- each parsed element, consider using 'skipParseD' in those cases.
 parseD
   :: (I.ParserInput a, Monad m, P.Proxy p)
   => Parser a b -- ^Attoparsec parser to run on the input stream.
@@ -104,6 +109,26 @@ parseD parser = \() -> loop
           loop
 {-# INLINABLE parseD #-}
 
+--------------------------------------------------------------------------------
+
+-- | Like 'parseD', except it consumes and discards useless input characters in
+-- between each parsed element.
+skipParseD
+  :: (I.ParserInput a, Monad m, P.Proxy p)
+  => (Char -> Bool) -- ^Should the given character in between valid input chunks
+                    -- be skipped?
+  -> Parser a b     -- ^Attoparsec parser to run on the input stream.
+  -> () -> P.Pipe (P.EitherP I.ParsingError (P.StateP [a] p)) (Maybe a) b m ()
+    -- ^Proxy compatible with the facilities provided by "Control.Proxy.Parse".
+skipParseD test parser = \() -> loop
+  where
+    loop = do
+        eof <- P.liftP $ isEndOfUsefulParserInput test
+        unless eof $ do
+          () <- P.respond =<< parse parser
+          loop
+
+--------------------------------------------------------------------------------
 
 -- | Like 'Pa.isEndOfInput', except it also consumes and discards leading
 -- empty 'I.ParserInput' chunks.
@@ -118,3 +143,23 @@ isEndOfParserInput = fix $ \loop -> do
        | otherwise -> Pa.unDraw a >> return False
       Nothing      -> return True
 {-# INLINABLE isEndOfParserInput #-}
+
+
+-- | Like 'isEndOfParserInput', except it also consumes and discards leading
+-- characters that are useless.
+isEndOfUsefulParserInput
+  :: (I.ParserInput a, Monad m, P.Proxy p)
+  => (Char -> Bool) -- ^Should the given leading character be skipped?
+  -> P.StateP [a] p () (Maybe a) y' y m Bool
+isEndOfUsefulParserInput test = fix $ \loop -> do
+    ma <- Pa.draw
+    case ma of
+      Nothing -> return True
+      Just a  -> do
+        let a' = I.dropWhile test a
+        if I.null a'
+           then loop
+           else Pa.unDraw a' >> return False
+{-# INLINABLE isEndOfUsefulParserInput #-}
+
+

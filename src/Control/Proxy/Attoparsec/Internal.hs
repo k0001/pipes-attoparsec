@@ -22,10 +22,10 @@ import           Control.Exception                 (Exception)
 import           Data.Attoparsec.Types             (Parser, IResult(..))
 import qualified Data.Attoparsec.ByteString        as AB (parse)
 import qualified Data.Attoparsec.Text              as AT (parse)
-import qualified Data.ByteString                   as B (ByteString, null)
+import qualified Data.ByteString.Char8             as B
 import           Data.Data                         (Data, Typeable)
 import           Data.Monoid                       (Monoid(mempty))
-import qualified Data.Text                         as T (Text, null)
+import qualified Data.Text                         as T
 import           Prelude                           hiding (null)
 
 --------------------------------------------------------------------------------
@@ -46,14 +46,19 @@ class (Monoid a) => ParserInput a where
     parse :: Parser a b -> a -> IResult a b
     -- | Tests whether @a@ is empty.
     null :: a -> Bool
+    -- | Drop leading characters from @a@ as long as they satisfy the given
+    -- predicate.
+    dropWhile :: (Char -> Bool) -> a -> a
 
 instance ParserInput B.ByteString where
-    parse   = AB.parse
-    null    = B.null
+    parse     = AB.parse
+    null      = B.null
+    dropWhile = B.dropWhile
 
 instance ParserInput T.Text where
-    parse   = AT.parse
-    null    = T.null
+    parse     = AT.parse
+    null      = T.null
+    dropWhile = T.dropWhile
 
 --------------------------------------------------------------------------------
 
