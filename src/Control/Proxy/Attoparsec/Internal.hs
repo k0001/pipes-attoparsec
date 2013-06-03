@@ -3,7 +3,7 @@
 -- | This module provides low-level integration with Attoparsec and is likely
 -- to be modified in backwards-incompatible ways in the future.
 --
--- Use the "Control.Proxy.Attoparsec" module instead.
+-- Use the stable API exported by the "Control.Proxy.Attoparsec" module instead.
 
 module Control.Proxy.Attoparsec.Internal
   ( -- * Types
@@ -12,7 +12,6 @@ module Control.Proxy.Attoparsec.Internal
     -- * Parsing
   , parseWith
   , parseWithMay
-  , parseWithMayNoNullCheck
     -- * Utils
   , mayInput
   ) where
@@ -96,15 +95,6 @@ parseWithMay refill p = parseWith loop p
            | otherwise -> return a
           Nothing      -> return mempty
 {-# INLINABLE parseWithMay #-}
-
-
--- | Like 'parseWithMay' except both 'Nothing' and @'Just' 'mempty'@
--- indicate end of input.
-parseWithMayNoNullCheck
-  :: (Monad m, ParserInput a) => m (Maybe a) -> Parser a r
-  -> m (Either ParsingError r, Maybe a)
-parseWithMayNoNullCheck refill = parseWith (return . maybe mempty id =<< refill)
-{-# INLINABLE parseWithMayNoNullCheck #-}
 
 
 -- | Wrap @a@ in 'Just' if not-null. Otherwise, 'Nothing'.

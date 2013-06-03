@@ -1,14 +1,13 @@
 -- | This module allows you to interleave Attoparsec parsing on input flowing
 -- downstream through pipes. This module builds on top of the 'pipes-parse'
 -- package, so the functionality exported by that package can be reused here.
---
--- This module is meant to be imported qualified
--- > import qualified Control.Proxy.Attoparsec as PA
 
 module Control.Proxy.Attoparsec
   ( -- * Parsing
     parseD
   , parse
+    -- * Utils
+  , isEndOfParserInput
     -- * Types
   , I.ParserInput
   , I.ParsingError(..)
@@ -24,6 +23,7 @@ import qualified Control.Proxy.Trans.Either        as P
 import qualified Control.Proxy.Trans.State         as P
 import           Data.Attoparsec.Types             (Parser)
 import           Data.Foldable                     (mapM_)
+import           Data.Function                     (fix)
 import           Prelude                           hiding (mapM_)
 
 --------------------------------------------------------------------------------
@@ -37,26 +37,20 @@ import           Prelude                           hiding (mapM_)
 --
 -- Requests more input from upstream using 'Pa.draw' when needed.
 --
--- /Do not/ use this proxy in streams that contain 'I.null' input chunks,
--- otherwise you'll get unexpected boundary errors. Instead, filter your
--- upstream beforehand so that it doesn't contain 'I.null' input chunks,
--- by using:
---
--- @
--- 'Pa.fmapPull' ('P.filterD' ('not' '.' 'I.null')) >-> ... 'parse' ...
--- @
+-- /Do not/ use this proxy unless 'isEndOfParserInput' returns 'False',
+-- otherwise you may get unexpected boundary errors.
 parse
   :: (I.ParserInput a, Monad m, P.Proxy p)
   => Parser a r
   -> () -> P.EitherP I.ParsingError (P.StateP [a] p) () (Maybe a) y' y m r
 parse parser = \() -> do
-    (er, mlo) <- P.liftP (I.parseWithMayNoNullCheck Pa.draw parser)
-    P.liftP $ mapM_ Pa.unDraw mlo
+    (er, mlo) <- P.liftP (I.parseWithMay Pa.draw parser)
+    P.liftP (mapM_ Pa.unDraw mlo)
     either P.throw return er
 {-# INLINABLE parse #-}
 
 
--- | Parses elements flowing downstream until 'Pa.isEndOfInput'.
+-- | Parses consecutive elements flowing downstream until 'isEndOfParserInput'.
 --
 -- This proxy is meant to be composed in the 'P.pull' category.
 --
@@ -70,14 +64,26 @@ parseD
   :: (I.ParserInput a, Monad m, P.Proxy p)
   => Parser a b
   -> () -> P.Pipe (P.EitherP I.ParsingError (P.StateP [a] p)) (Maybe a) b m ()
-parseD parser = skipNullsD P.>-> \() -> loop
+parseD parser = \() -> loop
   where
-    skipNullsD = Pa.fmapPull $ P.filterD (not . I.null)
     loop = do
-        eof <- P.liftP Pa.isEndOfInput
+        eof <- P.liftP isEndOfParserInput
         unless eof $ do
-            () <- P.respond =<< parse parser ()
-            loop
+          () <- P.respond =<< parse parser ()
+          loop
 {-# INLINABLE parseD #-}
 
 
+-- | Like 'Pa.isEndOfInput', except it also consumes and discards leading
+-- empty 'I.ParserInput' chunks.
+isEndOfParserInput
+  :: (I.ParserInput a, Monad m, P.Proxy p)
+  => P.StateP [a] p () (Maybe a) y' y m Bool
+isEndOfParserInput = fix $ \loop -> do
+    ma <- Pa.draw
+    case ma of
+      Just a
+       | I.null a  -> loop
+       | otherwise -> Pa.unDraw a >> return False
+      Nothing      -> return True
+{-# INLINABLE isEndOfParserInput #-}
