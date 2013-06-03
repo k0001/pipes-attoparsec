@@ -149,7 +149,7 @@ isEndOfParserInput = fix $ \loop -> do
 -- characters that are useless.
 isEndOfUsefulParserInput
   :: (I.ParserInput a, Monad m, P.Proxy p)
-  => (Char -> Bool) -- ^Should the given leading character be skipped?
+  => (Char -> Bool) -- ^Is the given leading character useless?
   -> P.StateP [a] p () (Maybe a) y' y m Bool
 isEndOfUsefulParserInput test = fix $ \loop -> do
     ma <- Pa.draw
