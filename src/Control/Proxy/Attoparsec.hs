@@ -12,7 +12,7 @@ module Control.Proxy.Attoparsec
   , parseD
   , skipParseD
     -- * Parser input
-  , I.ParserInput
+  , I.ParserInput(I.null)
   , isEndOfParserInput
   , skipParserInputWhile
     -- * Errors
