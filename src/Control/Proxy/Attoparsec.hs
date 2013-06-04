@@ -15,7 +15,9 @@ module Control.Proxy.Attoparsec
   , I.ParsingError(..)
     -- * Utils
   , skipParseD
+  , skipWhitespaceParseD
   , isEndOfParserInput
+  , isEndOfNonWhitespaceParserInput
   , isEndOfUsefulParserInput
   ) where
 
@@ -28,6 +30,7 @@ import qualified Control.Proxy.Attoparsec.Internal as I
 import qualified Control.Proxy.Trans.Either        as P
 import qualified Control.Proxy.Trans.State         as P
 import           Data.Attoparsec.Types             (Parser)
+import           Data.Char                         (isSpace)
 import           Data.Foldable                     (mapM_)
 import           Data.Function                     (fix)
 import           Prelude                           hiding (mapM_)
@@ -94,7 +97,8 @@ parse parser = do
 -- * Empty input chunks flowing downstream will be discarded.
 --
 -- Sometimes you might need to skip characters such as whitespace in between
--- each parsed element, consider using 'skipParseD' in those cases.
+-- each parsed element, consider using 'skipWhitespaceParseD' or 'skipParseD' in
+-- those cases.
 parseD
   :: (I.ParserInput a, Monad m, P.Proxy p)
   => Parser a b -- ^Attoparsec parser to run on the input stream.
@@ -127,6 +131,21 @@ skipParseD test parser = \() -> loop
         unless eof $ do
           () <- P.respond =<< parse parser
           loop
+{-# INLINABLE skipParseD #-}
+
+-- | Like 'parseD', except it consumes and discards whitespace characters in
+-- between each parsed element.
+--
+-- @
+-- 'skipWhitespaceParseD' = 'skipParseD' 'isSpace'
+-- @
+skipWhitespaceParseD
+  :: (I.ParserInput a, Monad m, P.Proxy p)
+  => Parser a b     -- ^Attoparsec parser to run on the input stream.
+  -> () -> P.Pipe (P.EitherP I.ParsingError (P.StateP [a] p)) (Maybe a) b m ()
+    -- ^Proxy compatible with the facilities provided by "Control.Proxy.Parse".
+skipWhitespaceParseD parser = skipParseD isSpace parser
+{-# INLINABLE skipWhitespaceParseD #-}
 
 --------------------------------------------------------------------------------
 
@@ -146,6 +165,19 @@ isEndOfParserInput = fix $ \loop -> do
 
 
 -- | Like 'isEndOfParserInput', except it also consumes and discards leading
+-- whitespace characters.
+--
+-- @
+-- 'isEndOfNonWhitespaceParserInput' = 'isEndOfUsefulParserInput' 'isSpace'
+-- @
+isEndOfNonWhitespaceParserInput
+  :: (I.ParserInput a, Monad m, P.Proxy p)
+  => P.StateP [a] p () (Maybe a) y' y m Bool
+isEndOfNonWhitespaceParserInput = isEndOfUsefulParserInput isSpace
+{-# INLINABLE isEndOfNonWhitespaceParserInput #-}
+
+
+-- | Like 'isEndOfParserInput', except it also consumes and discards leading
 -- characters that are useless.
 isEndOfUsefulParserInput
   :: (I.ParserInput a, Monad m, P.Proxy p)
@@ -161,5 +193,4 @@ isEndOfUsefulParserInput test = fix $ \loop -> do
            then loop
            else Pa.unDraw a' >> return False
 {-# INLINABLE isEndOfUsefulParserInput #-}
-
 
