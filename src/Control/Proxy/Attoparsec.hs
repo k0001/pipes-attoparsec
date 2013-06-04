@@ -35,10 +35,10 @@ import           Prelude                           hiding (mapM_)
 --------------------------------------------------------------------------------
 -- $parsing
 --
--- There are three different parsing facilities exported by this module, and
--- choosing between them is easy: If you need to interleave Attoparsec parsing
--- with other stream effects you must use 'parse', otherwise you may use the
--- simpler 'parseD'.
+-- There are two basic parsing facilities exported by this module, and choosing
+-- between them is easy: If you need to interleave Attoparsec parsing with other
+-- stream effects you must use 'parse', otherwise you may use the simpler
+-- 'parseD'.
 --
 -- These proxies use the 'P.EitherP' proxy transformer to report parsing errors,
 -- you might use any of the facilities exported by "Control.Proxy.Trans.Either"
