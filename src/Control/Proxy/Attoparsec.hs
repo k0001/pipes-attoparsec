@@ -61,7 +61,7 @@ import           Prelude                           hiding (mapM_)
 -- > loop = do
 -- >     eof <- liftP isEndOfParserInput
 -- >     unless eof $ do
--- >         -- 1. Possibly perform stream some effects here.
+-- >         -- 1. Possibly perform some stream effects here.
 -- >         -- 2. Parse one element from the stream.
 -- >         exampleElement <- parse myExampleParser
 -- >         -- 3. Do something with exampleElement and possibly perform
@@ -152,7 +152,7 @@ isEndOfParserInput = fix $ \loop -> do
 -- long as the given predicate holds 'True'.
 skipParserInputWhile
   :: (I.ParserInput a, Monad m, P.Proxy p)
-  => (Char -> Bool) -- ^Skip the given leading character?
+  => (Char -> Bool)
   -> P.StateP [a] p () (Maybe a) y' y m ()
 skipParserInputWhile test = fix $ \loop -> do
     ma <- Pa.draw
