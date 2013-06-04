@@ -10,12 +10,9 @@ module Control.Proxy.Attoparsec
     -- $parsing
     parse
   , parseD
-  , skipParseD
-    -- * Parser input
-  , I.ParserInput(I.null)
   , isEndOfParserInput
-  , skipParserInputWhile
-    -- * Errors
+    -- * Types
+  , I.ParserInput(I.null)
   , I.ParsingError(..)
   ) where
 
@@ -88,9 +85,6 @@ parse parser = do
 -- * Requests more input from upstream using 'Pa.draw' when needed.
 --
 -- * Empty input chunks flowing downstream will be discarded.
---
--- Sometimes you might need to skip characters such as whitespace preceding each
--- valid input, consider using 'skipParseD' in those cases.
 parseD
   :: (I.ParserInput a, Monad m, P.Proxy p)
   => Parser a b -- ^Attoparsec parser to run on the input stream.
@@ -104,33 +98,6 @@ parseD parser = \() -> loop
           () <- P.respond =<< parse parser
           loop
 {-# INLINABLE parseD #-}
-
--- | Like 'parseD', except before running the given parser it consumes and
--- discards any leading consecutive characters matching the given predicate.
---
--- For example, if elements in the input stream may be surrounded by whitespace,
--- then you could use:
---
--- @
---  'skipParseD' 'Data.Char.isSpace' myParser
--- @
-skipParseD
-  :: (I.ParserInput a, Monad m, P.Proxy p)
-  => (Char -> Bool) -- ^Should skip the given character preceeding a possibly
-                    -- valid input chunk?
-  -> Parser a b     -- ^Attoparsec parser to run on the input stream.
-  -> () -> P.Pipe (P.EitherP I.ParsingError (P.StateP [a] p)) (Maybe a) b m ()
-    -- ^Proxy compatible with the facilities provided by "Control.Proxy.Parse".
-skipParseD test parser = \() -> loop
-  where
-    loop = do
-        eof <- P.liftP $ do
-            skipParserInputWhile test
-            isEndOfParserInput
-        unless eof $ do
-            () <- P.respond =<< parse parser
-            loop
-{-# INLINABLE skipParseD #-}
 
 --------------------------------------------------------------------------------
 
@@ -147,21 +114,4 @@ isEndOfParserInput = fix $ \loop -> do
        | otherwise -> Pa.unDraw a >> return False
       Nothing      -> return True
 {-# INLINABLE isEndOfParserInput #-}
-
--- | Consume and discard leading 'I.ParserInput' characters from upstream as
--- long as the given predicate holds 'True'.
-skipParserInputWhile
-  :: (I.ParserInput a, Monad m, P.Proxy p)
-  => (Char -> Bool)
-  -> P.StateP [a] p () (Maybe a) y' y m ()
-skipParserInputWhile test = fix $ \loop -> do
-    ma <- Pa.draw
-    case ma of
-      Nothing -> return ()
-      Just a  -> do
-        let a' = I.dropWhile test a
-        if I.null a'
-           then loop
-           else Pa.unDraw a'
-{-# INLINABLE skipParserInputWhile #-}
 
