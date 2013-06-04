@@ -1,7 +1,7 @@
-# HEAD
+# Version 0.2.0.0
 
 * Droped the previous API in favour of a new and incompatible API
-  that supports interleaved parsing by relying in pipes-parse.
+  that supports interleaved parsing by relying on pipes-parse.
 
 # Version 0.1.0.1
 
