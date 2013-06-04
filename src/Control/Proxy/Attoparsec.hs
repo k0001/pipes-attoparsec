@@ -47,15 +47,13 @@ import           Prelude                           hiding (mapM_)
 
 -- | Parses one element flowing downstream.
 --
--- * This proxy is meant to be composed in the 'P.request' category.
---
 -- * In case of parsing errors, a 'I.ParsingError' exception is thrown in
 -- the 'Pe.EitherP' proxy transformer.
 --
 -- * Requests more input from upstream using 'Pa.draw' when needed.
 --
 -- * /Do not/ use this proxy if 'isEndOfParserInput' returns 'True',
--- otherwise you may get unexpected boundary errors.
+-- otherwise you may get unexpected boundary parsing errors.
 --
 -- Here is an example parsing loop that allows interleaving stream effects
 -- together with 'parse':
@@ -84,8 +82,6 @@ parse parser = do
 
 -- | Parses consecutive elements flowing downstream until 'isEndOfParserInput'.
 --
--- * This proxy is meant to be composed in the 'P.pull' category.
---
 -- * In case of parsing errors, a 'I.ParsingError' exception is thrown in the
 -- 'Pe.EitherP' proxy transformer.
 --
@@ -93,9 +89,8 @@ parse parser = do
 --
 -- * Empty input chunks flowing downstream will be discarded.
 --
--- Sometimes you might need to skip characters such as whitespace in between
--- each parsed element, consider using 'skipWhitespaceParseD' or 'skipParseD' in
--- those cases.
+-- Sometimes you might need to skip characters such as whitespace preceding each
+-- valid input, consider using 'skipParseD' in those cases.
 parseD
   :: (I.ParserInput a, Monad m, P.Proxy p)
   => Parser a b -- ^Attoparsec parser to run on the input stream.
@@ -113,7 +108,7 @@ parseD parser = \() -> loop
 -- | Like 'parseD', except before running the given parser it consumes and
 -- discards any leading consecutive characters matching the given predicate.
 --
--- For example, if elements in the imput stream may be surrounded by whitespace,
+-- For example, if elements in the input stream may be surrounded by whitespace,
 -- then you could use:
 --
 -- @

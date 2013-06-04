@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# OPTIONS_HADDOCK hide prune #-}
 
 -- | This module provides low-level integration with Attoparsec and is likely
 -- to be modified in backwards-incompatible ways in the future.
@@ -40,7 +41,8 @@ instance Exception ParsingError where
 
 --------------------------------------------------------------------------------
 
--- | A class for valid Attoparsec input types: 'T.Text' and 'B.ByteString'.
+-- | A class for valid Attoparsec input types: strict 'T.Text' and
+-- strict 'B.ByteString'.
 class (Monoid a) => ParserInput a where
     -- | Run a 'Parser' with input @a@.
     parse :: Parser a b -> a -> IResult a b
