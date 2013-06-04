@@ -43,7 +43,6 @@ test-suite tests
   hs-source-dirs: tests
   main-is:        Main.hs
   other-modules:  Test.Attoparsec
-                  Test.Tutorial
   ghc-options: -Wall -rtsopts -fno-warn-missing-signatures
 
   build-depends:
