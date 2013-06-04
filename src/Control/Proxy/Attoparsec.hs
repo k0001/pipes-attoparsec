@@ -50,7 +50,7 @@ import           Prelude                           hiding (mapM_)
 -- * Requests more input from upstream using 'Pa.draw' when needed.
 --
 -- * /Do not/ use this proxy if 'isEndOfParserInput' returns 'True',
--- otherwise you may get unexpected boundary parsing errors.
+-- otherwise you may get unexpected parsing errors.
 --
 -- Here is an example parsing loop that allows interleaving stream effects
 -- together with 'parse':
