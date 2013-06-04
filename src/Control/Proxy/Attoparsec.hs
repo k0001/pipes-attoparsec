@@ -116,8 +116,8 @@ parseD parser = \() -> loop
 -- @
 skipParseD
   :: (I.ParserInput a, Monad m, P.Proxy p)
-  => (Char -> Bool) -- ^Should the given character in between valid input chunks
-                    -- be skipped?
+  => (Char -> Bool) -- ^Should skip the given character preceeding a possibly
+                    -- valid input chunk?
   -> Parser a b     -- ^Attoparsec parser to run on the input stream.
   -> () -> P.Pipe (P.EitherP I.ParsingError (P.StateP [a] p)) (Maybe a) b m ()
     -- ^Proxy compatible with the facilities provided by "Control.Proxy.Parse".
