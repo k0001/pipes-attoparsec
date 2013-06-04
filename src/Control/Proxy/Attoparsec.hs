@@ -163,5 +163,5 @@ skipParserInputWhile test = fix $ \loop -> do
         if I.null a'
            then loop
            else Pa.unDraw a'
-
+{-# INLINABLE skipParserInputWhile #-}
 
