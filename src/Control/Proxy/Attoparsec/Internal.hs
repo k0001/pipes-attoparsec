@@ -48,19 +48,14 @@ class (Monoid a) => ParserInput a where
     parse :: Parser a b -> a -> IResult a b
     -- | Tests whether @a@ is empty.
     null :: a -> Bool
-    -- | Drop leading characters from @a@ as long as they satisfy the given
-    -- predicate.
-    dropWhile :: (Char -> Bool) -> a -> a
 
 instance ParserInput B.ByteString where
     parse      = AB.parse
     null       = B.null
-    dropWhile  = B.dropWhile
 
 instance ParserInput T.Text where
     parse      = AT.parse
     null       = T.null
-    dropWhile  = T.dropWhile
 
 --------------------------------------------------------------------------------
 
