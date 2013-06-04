@@ -80,7 +80,7 @@ parse parser = do
 {-# INLINABLE parse #-}
 
 
--- | Parses consecutive elements flowing downstream until 'isEndOfParserInput'.
+-- | Parses consecutive elements flowing downstream until end of input.
 --
 -- * In case of parsing errors, a 'I.ParsingError' exception is thrown in the
 -- 'Pe.EitherP' proxy transformer.
