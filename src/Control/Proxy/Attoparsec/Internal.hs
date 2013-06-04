@@ -20,8 +20,8 @@ module Control.Proxy.Attoparsec.Internal
 
 import           Control.Exception                 (Exception)
 import           Data.Attoparsec.Types             (Parser, IResult(..))
-import qualified Data.Attoparsec.ByteString        as AB (parse)
-import qualified Data.Attoparsec.Text              as AT (parse)
+import qualified Data.Attoparsec.ByteString        as AB
+import qualified Data.Attoparsec.Text              as AT
 import qualified Data.ByteString.Char8             as B
 import           Data.Data                         (Data, Typeable)
 import           Data.Monoid                       (Monoid(mempty))
@@ -51,14 +51,14 @@ class (Monoid a) => ParserInput a where
     dropWhile :: (Char -> Bool) -> a -> a
 
 instance ParserInput B.ByteString where
-    parse     = AB.parse
-    null      = B.null
-    dropWhile = B.dropWhile
+    parse      = AB.parse
+    null       = B.null
+    dropWhile  = B.dropWhile
 
 instance ParserInput T.Text where
-    parse     = AT.parse
-    null      = T.null
-    dropWhile = T.dropWhile
+    parse      = AT.parse
+    null       = T.null
+    dropWhile  = T.dropWhile
 
 --------------------------------------------------------------------------------
 
