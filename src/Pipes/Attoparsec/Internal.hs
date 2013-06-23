@@ -3,17 +3,14 @@
 -- | This module provides low-level integration with Attoparsec and is likely
 -- to be modified in backwards-incompatible ways in the future.
 --
--- Use the stable API exported by the "Control.Proxy.Attoparsec" module instead.
+-- Use the stable API exported by the "Pipes.Attoparsec" module instead.
 
 module Pipes.Attoparsec.Internal
   ( -- * Types
     ParsingError(..)
-  , ParserInput(..)
+  , ParserInput(null)
     -- * Parsing
-  , parseWith
   , parseWithMay
-    -- * Utils
-  , mayInput
   ) where
 
 --------------------------------------------------------------------------------
@@ -103,7 +100,8 @@ parseWithMay refill p = parseWith loop p
 
 -- | Wrap @a@ in 'Just' if not-null. Otherwise, 'Nothing'.
 mayInput :: ParserInput a => a -> Maybe a
-mayInput = \x -> if null x then Nothing else Just x
-{-# INLINABLE mayInput #-}
+mayInput x | null x    = Nothing
+           | otherwise = Just x
+{-# INLINE mayInput #-}
 
 

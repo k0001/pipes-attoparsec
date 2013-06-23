@@ -75,7 +75,7 @@ parse
 parse parser = do
     (er, mlo) <- hoist lift $ I.parseWithMay Pa.draw parser
     hoist lift $ mapM_ Pa.unDraw mlo
-    lift $ either E.throwError return er
+    either (lift . E.throwError) return er
 {-# INLINABLE parse #-}
 
 
