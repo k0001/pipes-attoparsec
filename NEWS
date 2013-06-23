@@ -1,3 +1,10 @@
+# Version HEAD
+
+* Upgrade to pipes-4.0.0, removing proxy transformers.
+
+* Use `Control.Monad.Trans.Error.ErrorT` to report `ParsingError`.
+
+
 # Version 0.2.0.0
 
 * Droped the previous API in favour of a new and incompatible API
