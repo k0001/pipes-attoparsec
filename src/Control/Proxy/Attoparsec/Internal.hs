@@ -20,6 +20,7 @@ module Control.Proxy.Attoparsec.Internal
 --------------------------------------------------------------------------------
 
 import           Control.Exception                 (Exception)
+import           Control.Monad.Trans.Error         (Error)
 import           Data.Attoparsec.Types             (Parser, IResult(..))
 import qualified Data.Attoparsec.ByteString        as AB
 import qualified Data.Attoparsec.Text              as AT
@@ -38,6 +39,7 @@ data ParsingError = ParsingError
   } deriving (Show, Eq, Data, Typeable)
 
 instance Exception ParsingError where
+instance Error ParsingError where
 
 --------------------------------------------------------------------------------
 

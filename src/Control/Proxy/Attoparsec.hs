@@ -1,9 +1,11 @@
+{-# LANGUAGE RankNTypes #-}
+
 -- | This module allows you to run Attoparsec parsers on input flowing
 -- downstream through Pipes streams, possibly interleaving other stream
 -- effects.
 --
 -- This module builds on top of the @pipes-parse@ package and assumes
--- you have read "Control.Proxy.Parse.Tutorial".
+-- you have read "Pipes.Parse.Tutorial".
 
 module Control.Proxy.Attoparsec
   ( -- * Parsing
@@ -19,11 +21,11 @@ module Control.Proxy.Attoparsec
 --------------------------------------------------------------------------------
 
 import           Control.Monad                     (unless)
-import qualified Control.Proxy                     as P
-import qualified Control.Proxy.Parse               as Pa
+import           Pipes
+import qualified Pipes.Parse                       as Pa
 import qualified Control.Proxy.Attoparsec.Internal as I
-import qualified Control.Proxy.Trans.Either        as P
-import qualified Control.Proxy.Trans.State         as P
+import qualified Control.Monad.Trans.Error         as E
+import qualified Control.Monad.Trans.State.Strict  as S
 import           Data.Attoparsec.Types             (Parser)
 import           Data.Foldable                     (mapM_)
 import           Data.Function                     (fix)
@@ -37,15 +39,15 @@ import           Prelude                           hiding (mapM_)
 -- stream effects you must use 'parse', otherwise you may use the simpler
 -- 'parseD'.
 --
--- These proxies use the 'P.EitherP' proxy transformer to report parsing errors,
--- you might use any of the facilities exported by "Control.Proxy.Trans.Either"
+-- These proxies use the 'E.ErrorT' monad transformer to report parsing errors,
+-- you might use any of the facilities exported by "Control.Monad.Trans.Error"
 -- to recover from them.
 
 
 -- | Parses one element flowing downstream.
 --
 -- * In case of parsing errors, a 'I.ParsingError' exception is thrown in
--- the 'Pe.EitherP' proxy transformer.
+-- the 'E.ErrorT' monad transformer.
 --
 -- * Requests more input from upstream using 'Pa.draw' when needed.
 --
@@ -56,7 +58,7 @@ import           Prelude                           hiding (mapM_)
 -- together with 'parse':
 --
 -- > loop = do
--- >     eof <- liftP isEndOfParserInput
+-- >     eof <- hoist lift $ isEndOfParserInput
 -- >     unless eof $ do
 -- >         -- 1. Possibly perform some stream effects here.
 -- >         -- 2. Parse one element from the stream.
@@ -66,36 +68,36 @@ import           Prelude                           hiding (mapM_)
 -- >         -- 4. Start all over again.
 -- >         loop
 parse
-  :: (I.ParserInput a, Monad m, P.Proxy p)
+  :: (I.ParserInput a, Monad m)
   => Parser a r -- ^Attoparsec parser to run on the input stream.
-  -> P.EitherP I.ParsingError (P.StateP [a] p) () (Maybe a) y' y m r
-    -- ^Proxy compatible with the facilities provided by "Control.Proxy.Parse".
+  -> Consumer (Maybe a) (E.ErrorT I.ParsingError (S.StateT [a] m)) r
+    -- ^Proxy compatible with the facilities provided by "Pipes.Parse".
 parse parser = do
-    (er, mlo) <- P.liftP (I.parseWithMay Pa.draw parser)
-    P.liftP (mapM_ Pa.unDraw mlo)
-    either P.throw return er
+    (er, mlo) <- hoist lift $ I.parseWithMay Pa.draw parser
+    hoist lift $ mapM_ Pa.unDraw mlo
+    lift $ either E.throwError return er
 {-# INLINABLE parse #-}
 
 
 -- | Parses consecutive elements flowing downstream until end of input.
 --
 -- * In case of parsing errors, a 'I.ParsingError' exception is thrown in the
--- 'Pe.EitherP' proxy transformer.
+-- 'E.ErrorT' monad transformer.
 --
 -- * Requests more input from upstream using 'Pa.draw' when needed.
 --
 -- * Empty input chunks flowing downstream will be discarded.
 parseD
-  :: (I.ParserInput a, Monad m, P.Proxy p)
+  :: (I.ParserInput a, Monad m)
   => Parser a b -- ^Attoparsec parser to run on the input stream.
-  -> () -> P.Pipe (P.EitherP I.ParsingError (P.StateP [a] p)) (Maybe a) b m ()
-    -- ^Proxy compatible with the facilities provided by "Control.Proxy.Parse".
+  -> () -> Pipe (Maybe a) b (E.ErrorT I.ParsingError (S.StateT [a] m)) ()
+    -- ^Proxy compatible with the facilities provided by "Pipes.Parse".
 parseD parser = \() -> loop
   where
     loop = do
-        eof <- P.liftP isEndOfParserInput
+        eof <- hoist lift $ isEndOfParserInput
         unless eof $ do
-          () <- P.respond =<< parse parser
+          () <- respond =<< parse parser
           loop
 {-# INLINABLE parseD #-}
 
@@ -104,8 +106,8 @@ parseD parser = \() -> loop
 -- | Like 'Pa.isEndOfInput', except it also consumes and discards leading
 -- empty 'I.ParserInput' chunks.
 isEndOfParserInput
-  :: (I.ParserInput a, Monad m, P.Proxy p)
-  => P.StateP [a] p () (Maybe a) y' y m Bool
+  :: (I.ParserInput a, Monad m)
+  => Consumer (Maybe a) (S.StateT [a] m) Bool
 isEndOfParserInput = fix $ \loop -> do
     ma <- Pa.draw
     case ma of
