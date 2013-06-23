@@ -6,7 +6,7 @@
 --
 -- Use the stable API exported by the "Control.Proxy.Attoparsec" module instead.
 
-module Control.Proxy.Attoparsec.Internal
+module Pipes.Attoparsec.Internal
   ( -- * Types
     ParsingError(..)
   , ParserInput(..)

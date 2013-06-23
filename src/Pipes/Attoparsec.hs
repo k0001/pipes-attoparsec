@@ -7,7 +7,7 @@
 -- This module builds on top of the @pipes-parse@ package and assumes
 -- you have read "Pipes.Parse.Tutorial".
 
-module Control.Proxy.Attoparsec
+module Pipes.Attoparsec
   ( -- * Parsing
     -- $parsing
     parse
@@ -23,7 +23,7 @@ module Control.Proxy.Attoparsec
 import           Control.Monad                     (unless)
 import           Pipes
 import qualified Pipes.Parse                       as Pa
-import qualified Control.Proxy.Attoparsec.Internal as I
+import qualified Pipes.Attoparsec.Internal         as I
 import qualified Control.Monad.Trans.Error         as E
 import qualified Control.Monad.Trans.State.Strict  as S
 import           Data.Attoparsec.Types             (Parser)

@@ -26,8 +26,8 @@ source-repository head
 
 library
   hs-source-dirs:  src
-  exposed-modules: Control.Proxy.Attoparsec
-                   Control.Proxy.Attoparsec.Internal
+  exposed-modules: Pipes.Attoparsec
+                   Pipes.Attoparsec.Internal
   build-depends:
       base         (==4.*)
     , pipes        (>=4.0 && <4.1)
