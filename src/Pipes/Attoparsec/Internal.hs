@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# OPTIONS_HADDOCK hide prune #-}
 
 -- | This module provides low-level integration with Attoparsec and is likely
 -- to be modified in backwards-incompatible ways in the future.
