@@ -24,7 +24,7 @@ import           Control.Monad                     (unless)
 import           Pipes
 import qualified Pipes.Parse                       as Pa
 import qualified Pipes.Attoparsec.Internal         as I
-import qualified Control.Monad.Trans.Error         as E
+import qualified Control.Monad.Trans.Either        as E
 import qualified Control.Monad.Trans.State.Strict  as S
 import           Data.Attoparsec.Types             (Parser)
 import           Data.Foldable                     (mapM_)
@@ -39,15 +39,15 @@ import           Prelude                           hiding (mapM_)
 -- stream effects you must use 'parse', otherwise you may use the simpler
 -- 'parseD'.
 --
--- These proxies use the 'E.ErrorT' monad transformer to report parsing errors,
--- you might use any of the facilities exported by "Control.Monad.Trans.Error"
+-- These proxies use the 'E.EitherT' monad transformer to report parsing errors,
+-- you might use any of the facilities exported by "Control.Monad.Trans.Either"
 -- to recover from them.
 
 
 -- | Parses one element flowing downstream.
 --
 -- * In case of parsing errors, a 'I.ParsingError' exception is thrown in
--- the 'E.ErrorT' monad transformer.
+-- the 'E.EitherT' monad transformer.
 --
 -- * Requests more input from upstream using 'Pa.draw' when needed.
 --
@@ -70,19 +70,19 @@ import           Prelude                           hiding (mapM_)
 parse
   :: (I.ParserInput a, Monad m)
   => Parser a r -- ^Attoparsec parser to run on the input stream.
-  -> Consumer (Maybe a) (E.ErrorT I.ParsingError (S.StateT [a] m)) r
+  -> Consumer (Maybe a) (E.EitherT I.ParsingError (S.StateT [a] m)) r
     -- ^Proxy compatible with the facilities provided by "Pipes.Parse".
 parse parser = do
     (er, mlo) <- hoist lift $ I.parseWithMay Pa.draw parser
     hoist lift $ mapM_ Pa.unDraw mlo
-    either (lift . E.throwError) return er
+    either (lift . E.left) return er
 {-# INLINABLE parse #-}
 
 
 -- | Parses consecutive elements flowing downstream until end of input.
 --
 -- * In case of parsing errors, a 'I.ParsingError' exception is thrown in the
--- 'E.ErrorT' monad transformer.
+-- 'E.EitherT' monad transformer.
 --
 -- * Requests more input from upstream using 'Pa.draw' when needed.
 --
@@ -90,7 +90,7 @@ parse parser = do
 parseD
   :: (I.ParserInput a, Monad m)
   => Parser a b -- ^Attoparsec parser to run on the input stream.
-  -> () -> Pipe (Maybe a) b (E.ErrorT I.ParsingError (S.StateT [a] m)) ()
+  -> () -> Pipe (Maybe a) b (E.EitherT I.ParsingError (S.StateT [a] m)) ()
     -- ^Proxy compatible with the facilities provided by "Pipes.Parse".
 parseD parser = \() -> loop
   where

@@ -2,7 +2,7 @@
 
 * Upgrade to pipes-4.0.0, removing proxy transformers.
 
-* Use `Control.Monad.Trans.Error.ErrorT` to report `ParsingError`.
+* Use `Control.Monad.Trans.Either.EitherT` to report `ParsingError`.
 
 
 # Version 0.2.0.0
