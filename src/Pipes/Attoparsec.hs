@@ -70,7 +70,7 @@ import           Prelude                           hiding (mapM_)
 parse
   :: (I.ParserInput a, Monad m)
   => Parser a r -- ^Attoparsec parser to run on the input stream.
-  -> Consumer (Maybe a) (E.EitherT I.ParsingError (S.StateT [a] m)) r
+  -> Client Pa.Draw (Maybe a) (E.EitherT I.ParsingError (S.StateT [a] m)) r
     -- ^Proxy compatible with the facilities provided by "Pipes.Parse".
 parse parser = do
     (er, mlo) <- hoist lift $ I.parseWithMay Pa.draw parser
@@ -90,8 +90,9 @@ parse parser = do
 parseD
   :: (I.ParserInput a, Monad m)
   => Parser a b -- ^Attoparsec parser to run on the input stream.
-  -> () -> Pipe (Maybe a) b (E.EitherT I.ParsingError (S.StateT [a] m)) ()
-    -- ^Proxy compatible with the facilities provided by "Pipes.Parse".
+  -> ()
+  -> Proxy Pa.Draw (Maybe a) () b (E.EitherT I.ParsingError (S.StateT [a] m)) ()
+      -- ^Proxy compatible with the facilities provided by "Pipes.Parse".
 parseD parser = \() -> loop
   where
     loop = do
@@ -107,7 +108,7 @@ parseD parser = \() -> loop
 -- empty 'I.ParserInput' chunks.
 isEndOfParserInput
   :: (I.ParserInput a, Monad m)
-  => Consumer (Maybe a) (S.StateT [a] m) Bool
+  => Client Pa.Draw (Maybe a) (S.StateT [a] m) Bool
 isEndOfParserInput = fix $ \loop -> do
     ma <- Pa.draw
     case ma of
