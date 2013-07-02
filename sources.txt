@@ -1,3 +1,2 @@
-./
 git://github.com/Gabriel439/Haskell-Pipes-Library.git master
 git://github.com/Gabriel439/Haskell-Pipes-Parse-Library.git 4.0.0

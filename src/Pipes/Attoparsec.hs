@@ -10,8 +10,8 @@
 module Pipes.Attoparsec
   ( -- * Parsing
     -- $parsing
-    parse
-  , parseD
+    parseOne
+  , parse
   , isEndOfParserInput
     -- * Types
   , I.ParserInput(I.null)
@@ -36,8 +36,8 @@ import           Prelude                           hiding (mapM_)
 --
 -- There are two basic parsing facilities exported by this module, and choosing
 -- between them is easy: If you need to interleave Attoparsec parsing with other
--- stream effects you must use 'parse', otherwise you may use the simpler
--- 'parseD'.
+-- stream effects you must use 'parseOne', otherwise you may use the simpler
+-- 'parse'.
 --
 -- These proxies use the 'E.EitherT' monad transformer to report parsing errors,
 -- you might use any of the facilities exported by "Control.Monad.Trans.Either"
@@ -55,28 +55,28 @@ import           Prelude                           hiding (mapM_)
 -- otherwise you may get unexpected parsing errors.
 --
 -- Here is an example parsing loop that allows interleaving stream effects
--- together with 'parse':
+-- together with 'parseOne':
 --
 -- > loop = do
 -- >     eof <- hoist lift $ isEndOfParserInput
 -- >     unless eof $ do
 -- >         -- 1. Possibly perform some stream effects here.
 -- >         -- 2. Parse one element from the stream.
--- >         exampleElement <- parse myExampleParser
+-- >         exampleElement <- parseOne myExampleParser
 -- >         -- 3. Do something with exampleElement and possibly perform
 -- >         --    some more stream effects.
 -- >         -- 4. Start all over again.
 -- >         loop
-parse
+parseOne
   :: (I.ParserInput a, Monad m)
   => Parser a r -- ^Attoparsec parser to run on the input stream.
   -> Client Pa.Draw (Maybe a) (E.EitherT I.ParsingError (S.StateT [a] m)) r
     -- ^Proxy compatible with the facilities provided by "Pipes.Parse".
-parse parser = do
+parseOne parser = do
     (er, mlo) <- hoist lift $ I.parseWithMay Pa.draw parser
     hoist lift $ mapM_ Pa.unDraw mlo
     either (lift . E.left) return er
-{-# INLINABLE parse #-}
+{-# INLINABLE parseOne #-}
 
 
 -- | Parses consecutive elements flowing downstream until end of input.
@@ -87,20 +87,20 @@ parse parser = do
 -- * Requests more input from upstream using 'Pa.draw' when needed.
 --
 -- * Empty input chunks flowing downstream will be discarded.
-parseD
+parse
   :: (I.ParserInput a, Monad m)
   => Parser a b -- ^Attoparsec parser to run on the input stream.
   -> ()
   -> Proxy Pa.Draw (Maybe a) () b (E.EitherT I.ParsingError (S.StateT [a] m)) ()
       -- ^Proxy compatible with the facilities provided by "Pipes.Parse".
-parseD parser = \() -> loop
+parse parser = \() -> loop
   where
     loop = do
         eof <- hoist lift $ isEndOfParserInput
         unless eof $ do
-          () <- respond =<< parse parser
+          () <- respond =<< parseOne parser
           loop
-{-# INLINABLE parseD #-}
+{-# INLINABLE parse #-}
 
 --------------------------------------------------------------------------------
 
