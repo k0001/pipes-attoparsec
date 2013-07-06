@@ -30,7 +30,6 @@ library
   other-modules:   Pipes.Attoparsec.Internal
   build-depends:
       base         (==4.*)
-    , either       (>=3.4 && <3.5)
     , pipes        (>=4.0 && <4.1)
     , pipes-parse  (>=1.0 && <1.1)
     , attoparsec   (>=0.10 && <0.11)
