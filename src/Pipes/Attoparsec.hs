@@ -10,8 +10,8 @@
 module Pipes.Attoparsec
   ( -- * Parsing
     -- $parsing
-    parseOne
-  , parse
+    parse
+  , parseMany
   , isEndOfParserInput
     -- * Types
   , I.ParserInput(I.null)
@@ -67,16 +67,15 @@ import           Prelude                           hiding (mapM_)
 -- >         --    some more stream effects.
 -- >         -- 4. Start all over again.
 -- >         loop
-parseOne
-  :: (I.ParserInput a, Monad m)
-  => Parser a r -- ^Attoparsec parser to run on the input stream.
-  -> Client Pa.Draw (Maybe a) (E.ErrorT I.ParsingError (S.StateT [a] m)) r
-    -- ^Proxy compatible with the facilities provided by "Pipes.Parse".
-parseOne parser = do
-    (er, mlo) <- hoist lift $ I.parseWithMay Pa.draw parser
-    hoist lift $ mapM_ Pa.unDraw mlo
-    either (lift . E.throwError) return er
-{-# INLINABLE parseOne #-}
+parse
+  :: (Monad m, I.ParserInput a)
+  => Parser a b
+  -> E.ErrorT I.ParsingError (S.StateT (Producer a m r) m) b
+parse parser = do
+    (er, mlo) <- lift (I.parseWithMay Pa.draw parser)
+    lift (mapM_ Pa.unDraw mlo)
+    either E.throwError return er
+{-# INLINABLE parse #-}
 
 
 -- | Parses consecutive elements flowing downstream until end of input.
@@ -86,29 +85,27 @@ parseOne parser = do
 --
 -- * Requests more input from upstream using 'Pa.draw' when needed.
 --
--- * Empty input chunks flowing downstream will be discarded.
-parse
-  :: (I.ParserInput a, Monad m)
-  => Parser a b -- ^Attoparsec parser to run on the input stream.
-  -> ()
-  -> Proxy Pa.Draw (Maybe a) () b (E.ErrorT I.ParsingError (S.StateT [a] m)) ()
-      -- ^Proxy compatible with the facilities provided by "Pipes.Parse".
-parse parser = \() -> loop
+-- -- * Empty input chunks flowing downstream will be discarded.
+parseMany
+  :: (Monad m, I.ParserInput a)
+  => Parser a b
+  -> Producer b (E.ErrorT I.ParsingError (S.StateT (Producer a m r) m)) ()
+parseMany parser = hoist lift Pa.input >-> loop
   where
     loop = do
-        eof <- hoist lift $ isEndOfParserInput
+        eof <- lift (lift isEndOfParserInput)
         unless eof $ do
-          () <- respond =<< parseOne parser
-          loop
-{-# INLINABLE parse #-}
+            () <- yield =<< lift (parse parser)
+            loop
+{-# INLINABLE parseMany #-}
 
 --------------------------------------------------------------------------------
 
--- | Like 'Pa.isEndOfInput', except it also consumes and discards leading
--- empty 'I.ParserInput' chunks.
+-- -- | Like 'Pa.isEndOfInput', except it also consumes and discards leading
+-- -- empty 'I.ParserInput' chunks.
 isEndOfParserInput
   :: (I.ParserInput a, Monad m)
-  => Client Pa.Draw (Maybe a) (S.StateT [a] m) Bool
+  => S.StateT (Producer a m r) m Bool
 isEndOfParserInput = fix $ \loop -> do
     ma <- Pa.draw
     case ma of
