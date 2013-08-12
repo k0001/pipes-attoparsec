@@ -33,6 +33,9 @@ import           Prelude                           hiding (mapM_)
 -- | Run an Attoparsec 'Parser' on input from the underlying 'Producer',
 -- returning either a 'I.ParsingError' on failure, or a pair with the parsed
 -- entity together with the length of input consumed in order to produce it.
+--
+-- Use this function only if 'isEndOfParserInput' returns 'False', otherwise
+-- you'll get unexpected parsing errors.
 parse
   :: (Monad m, I.ParserInput a)
   => Parser a b
