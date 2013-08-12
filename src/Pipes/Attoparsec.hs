@@ -1,11 +1,9 @@
-{-# LANGUAGE RankNTypes #-}
-
 -- | This module allows you to run Attoparsec parsers on input flowing
--- downstream through Pipes streams, possibly interleaving other stream
--- effects.
+-- downstream through 'Proxy' streams, possibly interleaving other stream
+-- effects while doing so.
 --
--- This Module builds on top of the @pipes-parse@ package and assumes
--- you have read "Pipes.Parse.Tutorial".
+-- This Module builds on top of the @pipes@ and @pipes-parse@ package and
+-- assumes you understand how to use those libraries.
 
 module Pipes.Attoparsec
   ( -- * Parsing
