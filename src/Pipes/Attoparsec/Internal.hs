@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- | This module provides low-level integration with Attoparsec and is likely
 -- to be modified in backwards-incompatible ways in the future.
@@ -24,7 +25,7 @@ import qualified Data.ByteString.Char8             as B
 import           Data.Data                         (Data, Typeable)
 import           Data.Monoid                       (Monoid(mempty))
 import qualified Data.Text                         as T
-import           Prelude                           hiding (null)
+import           Prelude                           hiding (null, length)
 
 --------------------------------------------------------------------------------
 
@@ -46,14 +47,18 @@ class (Monoid a) => ParserInput a where
     parse :: Parser a b -> a -> IResult a b
     -- | Tests whether @a@ is empty.
     null :: a -> Bool
+    -- | Length of @a@.
+    length :: a -> Int
 
 instance ParserInput B.ByteString where
     parse      = AB.parse
     null       = B.null
+    length     = B.length
 
 instance ParserInput T.Text where
     parse      = AT.parse
     null       = T.null
+    length     = T.length
 
 --------------------------------------------------------------------------------
 
@@ -66,12 +71,15 @@ parseWith
   -- input is available.
   -> Parser a r
   -- ^Parser to run on the given input
-  -> m (Either ParsingError r, Maybe a)
-  -- ^Either a parser error or a parsed result, together with any leftover.
-parseWith refill p = step . parse p =<< refill where
-    step (Partial k)  = step . k =<< refill
-    step (Done t r)   = return (Right r, mayInput t)
-    step (Fail t c m) = return (Left (ParsingError c m), mayInput t)
+  -> m (Either ParsingError (Int, r), Maybe a)
+  -- ^Either a parser error or a pair of a result and the parsed input length,
+  -- as well as an any leftovers.
+parseWith refill p = refill >>= \a -> step 0 (parse p a)
+  where
+    step !len res = case res of
+        Partial k  -> refill >>= \a -> step (len + length a) (k a)
+        Done t r   -> return (Right (len - length t, r), mayInput t)
+        Fail t c m -> return (Left (ParsingError c m)  , mayInput t)
 {-# INLINABLE parseWith #-}
 
 
@@ -84,17 +92,18 @@ parseWithMay
   -- input is available. @'Just' 'mempty'@ input is discarded.
   -> Parser a r
   -- ^Parser to run on the given input
-  -> m (Either ParsingError r, Maybe a)
-  -- ^Either a parser error or a parsed result, together with any leftover.
-parseWithMay refill p = parseWith loop p
+  -> m (Either ParsingError (Int, r), Maybe a)
+  -- ^Either a parser error or a pair of a result and the parsed input length,
+  -- as well as an any leftovers.
+parseWithMay refill = parseWith refill'
   where
-    loop = do
+    refill' = do
         ma <- refill
         case ma of
           Just a
-           | null a    -> loop  -- retry on null input
-           | otherwise -> return a
-          Nothing      -> return mempty
+            | null a    -> refill' -- retry on null input
+            | otherwise -> return a
+          Nothing       -> return mempty
 {-# INLINABLE parseWithMay #-}
 
 

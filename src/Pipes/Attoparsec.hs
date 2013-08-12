@@ -20,11 +20,10 @@ module Pipes.Attoparsec
 
 --------------------------------------------------------------------------------
 
-import           Control.Monad                     (unless)
 import           Pipes
-import qualified Pipes.Parse                       as Pa
+import qualified Pipes.Parse                       as P
+import qualified Pipes.Lift                        as P
 import qualified Pipes.Attoparsec.Internal         as I
-import qualified Control.Monad.Trans.Error         as E
 import qualified Control.Monad.Trans.State.Strict  as S
 import           Data.Attoparsec.Types             (Parser)
 import           Data.Foldable                     (mapM_)
@@ -32,86 +31,57 @@ import           Data.Function                     (fix)
 import           Prelude                           hiding (mapM_)
 
 --------------------------------------------------------------------------------
--- $parsing
---
--- There are two basic parsing facilities exported by this module, and choosing
--- between them is easy: If you need to interleave Attoparsec parsing with other
--- stream effects you must use 'parseOne', otherwise you may use the simpler
--- 'parse'.
---
--- These proxies use the 'E.ErrorT' monad transformer to report parsing errors,
--- you might use any of the facilities exported by "Control.Monad.Trans.Either"
--- to recover from them.
 
-
--- | Parses one element flowing downstream.
---
--- * In case of parsing errors, a 'I.ParsingError' exception is thrown in
--- the 'E.ErrorT' monad transformer.
---
--- * Requests more input from upstream using 'Pa.draw' when needed.
---
--- * /Do not/ use this proxy if 'isEndOfParserInput' returns 'True',
--- otherwise you may get unexpected parsing errors.
---
--- Here is an example parsing loop that allows interleaving stream effects
--- together with 'parseOne':
---
--- > loop = do
--- >     eof <- hoist lift $ isEndOfParserInput
--- >     unless eof $ do
--- >         -- 1. Possibly perform some stream effects here.
--- >         -- 2. Parse one element from the stream.
--- >         exampleElement <- parseOne myExampleParser
--- >         -- 3. Do something with exampleElement and possibly perform
--- >         --    some more stream effects.
--- >         -- 4. Start all over again.
--- >         loop
+-- | Run an Attoparsec 'Parser' on input from the underlying 'Producer',
+-- returning either a 'I.ParsingError' on failure, or a pair with the parsed
+-- entity together with the length of input consumed in order to produce it.
 parse
   :: (Monad m, I.ParserInput a)
   => Parser a b
-  -> E.ErrorT I.ParsingError (S.StateT (Producer a m r) m) b
+  -> S.StateT (Producer a m r) m (Either I.ParsingError (Int, b))
 parse parser = do
-    (er, mlo) <- lift (I.parseWithMay Pa.draw parser)
-    lift (mapM_ Pa.unDraw mlo)
-    either E.throwError return er
+    (eb, mlo) <- I.parseWithMay P.draw parser
+    mapM_ P.unDraw mlo
+    return eb
 {-# INLINABLE parse #-}
 
-
--- | Parses consecutive elements flowing downstream until end of input.
+-- | Continuously run an Attoparsec 'Parser' on input from the given 'Producer',
+-- sending downstream pairs of each successfully parsed entities together with
+-- the length of input consumed in order to produce them.
 --
--- * In case of parsing errors, a 'I.ParsingError' exception is thrown in the
--- 'E.ErrorT' monad transformer.
---
--- * Requests more input from upstream using 'Pa.draw' when needed.
---
--- -- * Empty input chunks flowing downstream will be discarded.
+-- This 'Producer' runs until it either runs out of input, in which case
+-- it returns 'Nothing', or until a parsing failure occurs, in which case it
+-- returns a pair of a 'I.ParsingError' and a 'Producer' with any leftovers.
 parseMany
   :: (Monad m, I.ParserInput a)
   => Parser a b
-  -> Producer b (E.ErrorT I.ParsingError (S.StateT (Producer a m r) m)) ()
-parseMany parser = hoist lift Pa.input >-> loop
+  -> Producer a m r
+  -> Producer (Int, b) m (Maybe I.ParsingError, Producer a m r)
+parseMany parser src = P.runStateP src loop
   where
     loop = do
-        eof <- lift (lift isEndOfParserInput)
-        unless eof $ do
-            () <- yield =<< lift (parse parser)
-            loop
-{-# INLINABLE parseMany #-}
+        eof <- lift isEndOfParserInput
+        if eof
+          then return Nothing
+          else do
+            eb <- lift (parse parser)
+            case eb of
+              Left e  -> return (Just e)
+              Right b -> yield b >> loop
 
 --------------------------------------------------------------------------------
 
--- -- | Like 'Pa.isEndOfInput', except it also consumes and discards leading
--- -- empty 'I.ParserInput' chunks.
+-- | Like 'P.isEndOfInput', except it also consumes and discards leading
+-- empty 'I.ParserInput' chunks.
 isEndOfParserInput
   :: (I.ParserInput a, Monad m)
   => S.StateT (Producer a m r) m Bool
 isEndOfParserInput = fix $ \loop -> do
-    ma <- Pa.draw
+    ma <- P.draw
     case ma of
       Just a
-       | I.null a  -> loop
-       | otherwise -> Pa.unDraw a >> return False
-      Nothing      -> return True
+        | I.null a  -> loop
+        | otherwise -> P.unDraw a >> return False
+      Nothing       -> return True
 {-# INLINABLE isEndOfParserInput #-}
 
