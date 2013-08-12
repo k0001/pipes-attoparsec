@@ -74,7 +74,7 @@ parseWith
   -> m (Either ParsingError (Int, r), Maybe a)
   -- ^Either a parser error or a pair of a result and the parsed input length,
   -- as well as an any leftovers.
-parseWith refill p = refill >>= \a -> step 0 (parse p a)
+parseWith refill p = refill >>= \a -> step (length a) (parse p a)
   where
     step !len res = case res of
         Partial k  -> refill >>= \a -> step (len + length a) (k a)
