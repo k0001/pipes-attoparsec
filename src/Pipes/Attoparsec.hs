@@ -56,10 +56,14 @@ parseMany
   :: (Monad m, I.ParserInput a)
   => Parser a b
   -> Producer a m r
-  -> Producer (Int, b) m (Maybe I.ParsingError, Producer a m r)
-parseMany parser src = P.runStateP src loop
+  -> Producer (Int, b) m (Maybe (I.ParsingError, Producer a m r))
+parseMany parser src = do
+    r <- P.runStateP src prod
+    case r of
+      (Nothing, _) -> return Nothing
+      (Just e,  p) -> return (Just (e, p))
   where
-    loop = do
+    prod = do
         eof <- lift isEndOfParserInput
         if eof
           then return Nothing
@@ -67,7 +71,7 @@ parseMany parser src = P.runStateP src loop
             eb <- lift (parse parser)
             case eb of
               Left e  -> return (Just e)
-              Right b -> yield b >> loop
+              Right b -> yield b >> prod
 
 --------------------------------------------------------------------------------
 
