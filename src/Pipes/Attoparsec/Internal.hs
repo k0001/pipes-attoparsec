@@ -1,5 +1,6 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -- | This module provides low-level integration with Attoparsec and is likely
 -- to be modified in backwards-incompatible ways in the future.
@@ -25,6 +26,7 @@ import qualified Data.ByteString.Char8             as B
 import           Data.Data                         (Data, Typeable)
 import           Data.Monoid                       (Monoid(mempty))
 import qualified Data.Text                         as T
+import           Pipes                             (Producer)
 import           Prelude                           hiding (null, length)
 
 --------------------------------------------------------------------------------
@@ -37,6 +39,10 @@ data ParsingError = ParsingError
 
 instance Exception ParsingError where
 instance Error     ParsingError where
+
+--------------------------------------------------------------------------------
+
+instance Monad m => Error (ParsingError, Producer a m r) where
 
 --------------------------------------------------------------------------------
 

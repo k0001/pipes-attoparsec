@@ -23,6 +23,7 @@ import qualified Pipes.Parse                       as P
 import qualified Pipes.Lift                        as P
 import qualified Pipes.Attoparsec.Internal         as I
 import qualified Control.Monad.Trans.State.Strict  as S
+import qualified Control.Monad.Trans.Error         as E
 import           Data.Attoparsec.Types             (Parser)
 import           Data.Foldable                     (mapM_)
 import           Data.Function                     (fix)
@@ -51,18 +52,19 @@ parse parser = do
 -- the length of input consumed in order to produce them.
 --
 -- This 'Producer' runs until it either runs out of input, in which case
--- it returns 'Nothing', or until a parsing failure occurs, in which case it
--- returns a pair of a 'I.ParsingError' and a 'Producer' with any leftovers.
+-- it returns '()', or until a parsing failure occurs, in which case it throws
+-- an error in the 'E.ErrorT' monad transformer indicating the 'I.ParsingError'
+-- and providing a 'Producer' with any leftovers.
 parseMany
   :: (Monad m, I.ParserInput a)
   => Parser a b
   -> Producer a m r
-  -> Producer (Int, b) m (Maybe (I.ParsingError, Producer a m r))
+  -> Producer (Int, b) (E.ErrorT (I.ParsingError, Producer a m r) m) ()
 parseMany parser src = do
-    r <- P.runStateP src prod
+    r <- hoist lift (P.runStateP src prod)
     case r of
-      (Nothing, _) -> return Nothing
-      (Just e,  p) -> return (Just (e, p))
+      (Just e,  p) -> lift (E.throwError (e, p))
+      (Nothing, _) -> lift (return ())
   where
     prod = do
         eof <- lift isEndOfParserInput
