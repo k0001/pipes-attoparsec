@@ -42,7 +42,7 @@ instance Error     ParsingError where
 
 --------------------------------------------------------------------------------
 
-instance Monad m => Error (ParsingError, Producer a m r) where
+instance (Monad m, ParserInput a) => Error (ParsingError, Producer a m r) where
 
 --------------------------------------------------------------------------------
 
