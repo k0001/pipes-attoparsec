@@ -26,7 +26,6 @@ import qualified Control.Monad.Trans.State.Strict  as S
 import qualified Control.Monad.Trans.Error         as E
 import           Data.Attoparsec.Types             (Parser)
 import           Data.Foldable                     (mapM_)
-import           Data.Function                     (fix)
 import           Prelude                           hiding (mapM_)
 
 --------------------------------------------------------------------------------
@@ -41,8 +40,8 @@ parse
   :: (Monad m, I.ParserInput a)
   => Parser a b
   -> S.StateT (Producer a m r) m (Either I.ParsingError (Int, b))
-parse parser = do
-    (eb, mlo) <- I.parseWithMay P.draw parser
+parse attoparser = do
+    (eb, mlo) <- I.parseWithMay P.draw attoparser
     mapM_ P.unDraw mlo
     return eb
 {-# INLINABLE parse #-}
@@ -60,7 +59,7 @@ parseMany
   => Parser a b
   -> Producer a m r
   -> Producer (Int, b) (E.ErrorT (I.ParsingError, Producer a m r) m) ()
-parseMany parser src = do
+parseMany attoparser src = do
     r <- hoist lift (P.runStateP src prod)
     case r of
       (Just e,  p) -> lift (E.throwError (e, p))
@@ -71,7 +70,7 @@ parseMany parser src = do
         if eof
           then return Nothing
           else do
-            eb <- lift (parse parser)
+            eb <- lift (parse attoparser)
             case eb of
               Left e  -> return (Just e)
               Right b -> yield b >> prod
@@ -83,11 +82,11 @@ parseMany parser src = do
 isEndOfParserInput
   :: (I.ParserInput a, Monad m)
   => S.StateT (Producer a m r) m Bool
-isEndOfParserInput = fix $ \loop -> do
+isEndOfParserInput = do
     ma <- P.draw
     case ma of
       Just a
-        | I.null a  -> loop
+        | I.null a  -> isEndOfParserInput
         | otherwise -> P.unDraw a >> return False
       Nothing       -> return True
 {-# INLINABLE isEndOfParserInput #-}

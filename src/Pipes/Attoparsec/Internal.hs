@@ -37,12 +37,12 @@ data ParsingError = ParsingError
   , peMessage  :: String    -- ^ Parsing error description message.
   } deriving (Show, Eq, Data, Typeable)
 
-instance Exception ParsingError where
-instance Error     ParsingError where
+instance Exception ParsingError
+instance Error     ParsingError
 
 --------------------------------------------------------------------------------
 
-instance (Monad m, ParserInput a) => Error (ParsingError, Producer a m r) where
+instance (Monad m, ParserInput a) => Error (ParsingError, Producer a m r)
 
 --------------------------------------------------------------------------------
 
