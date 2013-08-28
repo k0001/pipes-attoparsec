@@ -23,7 +23,6 @@ import qualified Pipes.Parse                       as P
 import qualified Pipes.Lift                        as P
 import qualified Pipes.Attoparsec.Internal         as I
 import qualified Control.Monad.Trans.State.Strict  as S
-import qualified Control.Monad.Trans.Error         as E
 import           Data.Attoparsec.Types             (Parser)
 import           Data.Foldable                     (mapM_)
 import           Prelude                           hiding (mapM_)
@@ -50,20 +49,28 @@ parse attoparser = do
 -- sending downstream pairs of each successfully parsed entities together with
 -- the length of input consumed in order to produce them.
 --
--- This 'Producer' runs until it either runs out of input, in which case
--- it returns '()', or until a parsing failure occurs, in which case it throws
--- an error in the 'E.ErrorT' monad transformer indicating the 'I.ParsingError'
--- and providing a 'Producer' with any leftovers.
+-- This 'Producer' runs until it either runs out of input, in which case it
+-- returns @'Right' ()@, or until a parsing failure occurs, in which case
+-- it returns a 'Left' providing the 'I.ParsingError' and a 'Producer' with any
+-- leftovers.
+--
+-- Hints:
+--
+-- * @(('Control.Monad.Trans.Free.liftF'.).'parseMany')@ is a /splitter/, as
+-- explained in "Pipes.Parse".
+--
+-- * You can use 'P.errorP' to promote the 'Either' return value to an
+-- 'Control.Monad.Trans.Error.ErrorT' monad transformer.
 parseMany
   :: (Monad m, I.ParserInput a)
   => Parser a b
   -> Producer a m r
-  -> Producer (Int, b) (E.ErrorT (I.ParsingError, Producer a m r) m) ()
+  -> Producer (Int, b) m (Either (I.ParsingError, Producer a m r) ())
 parseMany attoparser src = do
-    r <- hoist lift (P.runStateP src prod)
-    case r of
-      (Just e,  p) -> lift (E.throwError (e, p))
-      (Nothing, _) -> lift (return ())
+    (me, src') <- P.runStateP src prod
+    return $ case me of
+      Just e  -> Left (e, src')
+      Nothing -> Right ()
   where
     prod = do
         eof <- lift isEndOfParserInput
