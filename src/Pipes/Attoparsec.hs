@@ -1,3 +1,5 @@
+{-# Language RankNTypes #-}
+
 -- | This module allows you to run Attoparsec parsers on input flowing
 -- downstream through pipes, possibly interleaving other stream effects
 -- while doing so.
@@ -70,9 +72,9 @@ parse attoparser = do
 --   @
 parseMany
   :: (Monad m, I.ParserInput a)
-  => Parser a b      -- ^Attoparsec parser.
-  -> Producer a m r  -- ^Producer from which to draw input.
-  -> Producer (Int, b) m (Either (I.ParsingError, Producer a m r) ())
+  => Parser a b       -- ^Attoparsec parser.
+  -> Producer' a m r  -- ^Producer from which to draw input.
+  -> Producer' (Int, b) m (Either (I.ParsingError, Producer a m r) ())
 parseMany attoparser src = do
     (me, src') <- P.runStateP src go
     return $ case me of
