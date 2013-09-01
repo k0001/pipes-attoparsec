@@ -1,8 +1,8 @@
 -- | This module allows you to run Attoparsec parsers on input flowing
--- downstream through 'Proxy' streams, possibly interleaving other stream
--- effects while doing so.
+-- downstream through pipes, possibly interleaving other stream effects
+-- while doing so.
 --
--- This Module builds on top of the @pipes@ and @pipes-parse@ package and
+-- This module builds on top of the @pipes@ and @pipes-parse@ package and
 -- assumes you understand how to use those libraries.
 
 module Pipes.Attoparsec
@@ -19,13 +19,11 @@ module Pipes.Attoparsec
 --------------------------------------------------------------------------------
 
 import           Pipes
-import qualified Pipes.Parse                       as P
+import qualified Pipes.Parse                       as Pp
 import qualified Pipes.Lift                        as P
 import qualified Pipes.Attoparsec.Internal         as I
 import qualified Control.Monad.Trans.State.Strict  as S
 import           Data.Attoparsec.Types             (Parser)
-import           Data.Foldable                     (mapM_)
-import           Prelude                           hiding (mapM_)
 
 --------------------------------------------------------------------------------
 
@@ -37,17 +35,19 @@ import           Prelude                           hiding (mapM_)
 -- you'll get unexpected parsing errors.
 parse
   :: (Monad m, I.ParserInput a)
-  => Parser a b
+  => Parser a b  -- ^Attoparsec parser.
   -> S.StateT (Producer a m r) m (Either I.ParsingError (Int, b))
 parse attoparser = do
-    (eb, mlo) <- I.parseWithMay P.draw attoparser
-    mapM_ P.unDraw mlo
+    (eb, mlo) <- I.parseWithMay Pp.draw attoparser
+    case mlo of
+      Just lo -> Pp.unDraw lo
+      Nothing -> return ()
     return eb
 {-# INLINABLE parse #-}
 
 -- | Continuously run an Attoparsec 'Parser' on input from the given 'Producer',
--- sending downstream pairs of each successfully parsed entities together with
--- the length of input consumed in order to produce them.
+-- sending downstream pairs of each successfully parsed entity together with the
+-- length of input consumed in order to produce it.
 --
 -- This 'Producer' runs until it either runs out of input, in which case it
 -- returns @'Right' ()@, or until a parsing failure occurs, in which case
@@ -56,31 +56,38 @@ parse attoparser = do
 --
 -- Hints:
 --
--- * @(('Control.Monad.Trans.Free.liftF'.).'parseMany')@ is a /splitter/, as
--- explained in "Pipes.Parse".
---
 -- * You can use 'P.errorP' to promote the 'Either' return value to an
--- 'Control.Monad.Trans.Error.ErrorT' monad transformer.
+--   'Control.Monad.Trans.Error.ErrorT' monad transformer, which might be
+--   particularly handy if you are trying compose this 'Producer' with another
+--   'Proxy' that's not so flexible about the return types it accepts.
+--
+--   @
+--   \\parser src -> 'P.errorP' ('parseMany' parser src)
+--      :: ('Monad' m, 'I.ParserInput' a)
+--      => 'Parser' a b
+--      -> 'Producer' a m r
+--      -> 'Producer' ('Int', b) ('Control.Monad.Trans.Error.ErrorT' ('I.ParsingError', 'Producer' a m r) m) ()
+--   @
 parseMany
   :: (Monad m, I.ParserInput a)
-  => Parser a b
-  -> Producer a m r
+  => Parser a b      -- ^Attoparsec parser.
+  -> Producer a m r  -- ^Producer from which to draw input.
   -> Producer (Int, b) m (Either (I.ParsingError, Producer a m r) ())
 parseMany attoparser src = do
-    (me, src') <- P.runStateP src prod
+    (me, src') <- P.runStateP src go
     return $ case me of
-      Just e  -> Left (e, src')
+      Just e  -> Left  (e, src')
       Nothing -> Right ()
   where
-    prod = do
+    go = do
         eof <- lift isEndOfParserInput
         if eof
           then return Nothing
           else do
             eb <- lift (parse attoparser)
             case eb of
-              Left e  -> return (Just e)
-              Right b -> yield b >> prod
+              Left  e -> return (Just e)
+              Right b -> yield b >> go
 
 --------------------------------------------------------------------------------
 
@@ -90,11 +97,11 @@ isEndOfParserInput
   :: (I.ParserInput a, Monad m)
   => S.StateT (Producer a m r) m Bool
 isEndOfParserInput = do
-    ma <- P.draw
+    ma <- Pp.draw
     case ma of
       Just a
         | I.null a  -> isEndOfParserInput
-        | otherwise -> P.unDraw a >> return False
+        | otherwise -> Pp.unDraw a >> return False
       Nothing       -> return True
 {-# INLINABLE isEndOfParserInput #-}
 
