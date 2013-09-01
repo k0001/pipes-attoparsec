@@ -85,7 +85,7 @@ parseWith refill p = refill >>= \a -> step (length a) (parse p a)
     step !len res = case res of
         Partial k  -> refill >>= \a -> step (len + length a) (k a)
         Done t r   -> return (Right (len - length t, r), mayInput t)
-        Fail t c m -> return (Left (ParsingError c m)  , mayInput t)
+        Fail t c m -> return (Left  (ParsingError c m) , mayInput t)
 {-# INLINABLE parseWith #-}
 
 
