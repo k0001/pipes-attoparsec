@@ -1,14 +1,14 @@
 # Version HEAD
 
-* Upgrade to pipes-4.0.0, removing proxy transformers.
-
-* Use `Control.Monad.Trans.Either.EitherT` to report `ParsingError`.
+* Upgrade to pipes-4.0.0 and pipes-parse-2.0.0, removing proxy
+  transformers and changing the API substantially.
 
 
 # Version 0.2.0.0
 
 * Droped the previous API in favour of a new and incompatible API
   that supports interleaved parsing by relying on pipes-parse.
+
 
 # Version 0.1.0.1
 
