@@ -73,7 +73,7 @@ parse attoparser = do
 parseMany
   :: (Monad m, I.ParserInput a)
   => Parser a b       -- ^Attoparsec parser.
-  -> Producer' a m r  -- ^Producer from which to draw input.
+  -> Producer a m r   -- ^Producer from which to draw input.
   -> Producer' (Int, b) m (Either (I.ParsingError, Producer a m r) ())
 parseMany attoparser src = do
     (me, src') <- P.runStateP src go
