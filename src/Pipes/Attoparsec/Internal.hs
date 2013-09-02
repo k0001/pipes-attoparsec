@@ -10,7 +10,7 @@
 module Pipes.Attoparsec.Internal
   ( -- * Types
     ParsingError(..)
-  , ParserInput(null)
+  , ParserInput
     -- * Parsing
   , parseWithMay
   ) where
@@ -48,22 +48,18 @@ instance (Monad m, ParserInput a) => Error (ParsingError, Producer a m r)
 
 -- | A class for valid Attoparsec input types: strict 'T.Text' and
 -- strict 'B.ByteString'.
-class (Monoid a) => ParserInput a where
+class (Eq a, Monoid a) => ParserInput a where
     -- | Run a 'Parser' with input @a@.
     parse :: Parser a b -> a -> IResult a b
-    -- | Tests whether @a@ is empty.
-    null :: a -> Bool
     -- | Length of @a@.
     length :: a -> Int
 
 instance ParserInput B.ByteString where
     parse      = AB.parse
-    null       = B.null
     length     = B.length
 
 instance ParserInput T.Text where
     parse      = AT.parse
-    null       = T.null
     length     = T.length
 
 --------------------------------------------------------------------------------
@@ -107,16 +103,16 @@ parseWithMay refill = parseWith refill'
         ma <- refill
         case ma of
           Just a
-            | null a    -> refill' -- retry on null input
-            | otherwise -> return a
-          Nothing       -> return mempty
+            | a == mempty -> refill' -- retry on null input
+            | otherwise   -> return a
+          Nothing         -> return mempty
 {-# INLINABLE parseWithMay #-}
 
 
 -- | Wrap @a@ in 'Just' if not-null. Otherwise, 'Nothing'.
 mayInput :: ParserInput a => a -> Maybe a
-mayInput x | null x    = Nothing
-           | otherwise = Just x
+mayInput x | x == mempty = Nothing
+           | otherwise   = Just x
 {-# INLINE mayInput #-}
 
 

@@ -14,7 +14,7 @@ module Pipes.Attoparsec
   , parseMany
   , isEndOfParserInput
     -- * Types
-  , I.ParserInput(I.null)
+  , I.ParserInput
   , I.ParsingError(..)
   ) where
 
@@ -26,6 +26,7 @@ import qualified Pipes.Lift                        as P
 import qualified Pipes.Attoparsec.Internal         as I
 import qualified Control.Monad.Trans.State.Strict  as S
 import           Data.Attoparsec.Types             (Parser)
+import           Data.Monoid                       (Monoid(mempty))
 
 --------------------------------------------------------------------------------
 
@@ -102,8 +103,8 @@ isEndOfParserInput = do
     ma <- Pp.draw
     case ma of
       Just a
-        | I.null a  -> isEndOfParserInput
-        | otherwise -> Pp.unDraw a >> return False
-      Nothing       -> return True
+        | a == mempty -> isEndOfParserInput
+        | otherwise   -> Pp.unDraw a >> return False
+      Nothing         -> return True
 {-# INLINABLE isEndOfParserInput #-}
 
