@@ -1,5 +1,7 @@
 # pipes-attoparsec
 
+[![Build Status](https://secure.travis-ci.org/k0001/pipes-attoparsec.png)](http://travis-ci.org/k0001/pipes-attoparsec)
+
 Utilities to run **Attoparsec** parser on **Pipes** input streams.
 
 Check the source or rendered Haddocks for documentation.
