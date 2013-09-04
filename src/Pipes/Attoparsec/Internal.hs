@@ -35,7 +35,7 @@ import           Prelude                           hiding (null, length)
 data ParsingError = ParsingError
   { peContexts :: [String]  -- ^ Contexts where the parsing error occurred.
   , peMessage  :: String    -- ^ Parsing error description message.
-  } deriving (Show, Eq, Data, Typeable)
+  } deriving (Show, Read, Eq, Data, Typeable)
 
 instance Exception ParsingError
 instance Error     ParsingError
