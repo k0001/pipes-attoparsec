@@ -9,7 +9,6 @@
 
 module Pipes.Attoparsec
   ( -- * Parsing
-    -- $parsing
     parse
   , parseMany
   , isEndOfParserInput
