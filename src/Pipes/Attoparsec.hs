@@ -69,7 +69,7 @@ parse attoparser = do
 --      :: ('Monad' m, 'I.ParserInput' a)
 --      => 'Parser' a b
 --      -> 'Producer' a m r
---      -> 'Producer' ('Int', b) ('Control.Monad.Trans.Error.ErrorT' ('I.ParsingError', 'Producer' a m r) m) ()
+--      -> 'Producer'' ('Int', b) ('Control.Monad.Trans.Error.ErrorT' ('I.ParsingError', 'Producer' a m r) m) ()
 --   @
 parseMany
   :: (Monad m, I.ParserInput a)
