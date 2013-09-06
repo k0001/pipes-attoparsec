@@ -51,25 +51,9 @@ parse attoparser = do
 -- sending downstream pairs of each successfully parsed entity together with the
 -- length of input consumed in order to produce it.
 --
--- This 'Producer' runs until it either runs out of input, in which case it
--- returns @'Right' ()@, or until a parsing failure occurs, in which case
--- it returns a 'Left' providing the 'I.ParsingError' and a 'Producer' with any
--- leftovers.
---
--- Hints:
---
--- * You can use 'P.errorP' to promote the 'Either' return value to an
---   'Control.Monad.Trans.Error.ErrorT' monad transformer, which might be
---   particularly handy if you are trying compose this 'Producer' with another
---   'Proxy' that's not so flexible about the return types it accepts.
---
---   @
---   \\parser src -> 'P.errorP' ('parseMany' parser src)
---      :: ('Monad' m, 'I.ParserInput' a)
---      => 'Parser' a b
---      -> 'Producer' a m r
---      -> 'Producer'' ('Int', b) ('Control.Monad.Trans.Error.ErrorT' ('I.ParsingError', 'Producer' a m r) m) ()
---   @
+-- This 'Producer' runs until it either runs out of input or until a parsing
+-- failure occurs, in which case it returns 'Left' with a 'I.ParsingError' and a
+-- 'Producer' with any leftovers.
 parseMany
   :: (Monad m, I.ParserInput a)
   => Parser a b       -- ^Attoparsec parser.
