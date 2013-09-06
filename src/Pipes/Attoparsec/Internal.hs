@@ -12,7 +12,7 @@ module Pipes.Attoparsec.Internal
     ParsingError(..)
   , ParserInput
     -- * Parsing
-  , parseWithMay
+  , parseWithDraw
   ) where
 
 --------------------------------------------------------------------------------
@@ -27,6 +27,7 @@ import           Data.Data                         (Data, Typeable)
 import           Data.Monoid                       (Monoid(mempty))
 import qualified Data.Text                         as T
 import           Pipes                             (Producer)
+import qualified Pipes.Parse                       as Pp
 import           Prelude                           hiding (null, length)
 
 --------------------------------------------------------------------------------
@@ -65,7 +66,7 @@ instance ParserInput T.Text where
 --------------------------------------------------------------------------------
 
 -- | Run a parser drawing input from the given monadic action as needed.
-parseWith
+parseWithRaw
   :: (Monad m, ParserInput a)
   => m a
   -- ^An action that will be executed to provide the parser with more input
@@ -76,43 +77,37 @@ parseWith
   -> m (Either ParsingError (Int, r), Maybe a)
   -- ^Either a parser error or a pair of a result and the parsed input length,
   -- as well as an any leftovers.
-parseWith refill p = refill >>= \a -> step (length a) (parse p a)
+parseWithRaw refill p = refill >>= \a -> step (length a) (parse p a)
   where
     step !len res = case res of
         Partial k  -> refill >>= \a -> step (len + length a) (k a)
         Done t r   -> return (Right (len - length t, r), mayInput t)
         Fail t c m -> return (Left  (ParsingError c m) , mayInput t)
-{-# INLINABLE parseWith #-}
+{-# INLINABLE parseWithRaw #-}
 
-
--- | Run a parser drawing input from the given monadic action as needed.
-parseWithMay
+-- | Run a parser drawing input from the underlying 'Producer'.
+parseWithDraw
   :: (Monad m, ParserInput a)
-  => m (Maybe a)
-  -- ^An action that will be executed to provide the parser with more input
-  -- as needed. If the action returns 'Nothing', then it's assumed no more
-  -- input is available. @'Just' 'mempty'@ input is discarded.
-  -> Parser a r
+  => Parser a b
   -- ^Parser to run on the given input
-  -> m (Either ParsingError (Int, r), Maybe a)
+  -> Pp.StateT (Producer a m r) m (Either ParsingError (Int, b), Maybe a)
   -- ^Either a parser error or a pair of a result and the parsed input length,
   -- as well as an any leftovers.
-parseWithMay refill = parseWith refill'
+parseWithDraw = parseWithRaw refill
   where
-    refill' = do
-        ma <- refill
-        case ma of
-          Just a
-            | a == mempty -> refill' -- retry on null input
+    refill = do
+        ra <- Pp.draw
+        case ra of
+          Left  _         -> return mempty
+          Right a
+            | a == mempty -> refill
             | otherwise   -> return a
-          Nothing         -> return mempty
-{-# INLINABLE parseWithMay #-}
+{-# INLINABLE parseWithDraw #-}
 
+--------------------------------------------------------------------------------
 
 -- | Wrap @a@ in 'Just' if not-null. Otherwise, 'Nothing'.
 mayInput :: ParserInput a => a -> Maybe a
 mayInput x | x == mempty = Nothing
            | otherwise   = Just x
 {-# INLINE mayInput #-}
-
-

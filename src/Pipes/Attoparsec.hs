@@ -40,7 +40,7 @@ parse
   => Parser a b  -- ^Attoparsec parser.
   -> S.StateT (Producer a m r) m (Either I.ParsingError (Int, b))
 parse attoparser = do
-    (eb, mlo) <- I.parseWithMay Pp.draw attoparser
+    (eb, mlo) <- I.parseWithDraw attoparser
     case mlo of
       Just lo -> Pp.unDraw lo
       Nothing -> return ()
@@ -101,9 +101,9 @@ isEndOfParserInput
 isEndOfParserInput = do
     ma <- Pp.draw
     case ma of
-      Just a
+      Left  _         -> return True
+      Right a
         | a == mempty -> isEndOfParserInput
         | otherwise   -> Pp.unDraw a >> return False
-      Nothing         -> return True
 {-# INLINABLE isEndOfParserInput #-}
 
