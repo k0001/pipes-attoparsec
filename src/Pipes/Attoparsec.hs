@@ -74,22 +74,27 @@ parseMany
   :: (Monad m, I.ParserInput a)
   => Parser a b       -- ^Attoparsec parser.
   -> Producer a m r   -- ^Producer from which to draw input.
-  -> Producer' (Int, b) m (Either (I.ParsingError, Producer a m r) ())
+  -> Producer' (Int, b) m (Either (I.ParsingError, Producer a m r) r)
 parseMany attoparser src = do
     (me, src') <- P.runStateP src go
     return $ case me of
-      Just e  -> Left  (e, src')
-      Nothing -> Right ()
+      Left e  -> Left  (e, src')
+      Right r -> Right r
   where
     go = do
         eof <- lift isEndOfParserInput
         if eof
-          then return Nothing
+          then done
           else do
             eb <- lift (parse attoparser)
             case eb of
-              Left  e -> return (Just e)
+              Left  e -> return (Left e)
               Right b -> yield b >> go
+    done = do
+        ra <- lift Pp.draw
+        case ra of
+          Left r  -> return (Right r)
+          Right _ -> error "parseMany: The impossible happened!"
 
 --------------------------------------------------------------------------------
 
