@@ -4,18 +4,17 @@
 module Test.Attoparsec (tests) where
 
 import           Control.Monad
-import           Control.Proxy                  ((>->))
-import qualified Control.Proxy                  as P
-import qualified Control.Proxy.Trans.State      as P
-import qualified Control.Proxy.Trans.Either     as P
-import qualified Control.Proxy.Trans.Writer     as P
-import qualified Control.Proxy.Parse            as Pa
-import           Control.Proxy.Attoparsec       (parseD)
-import qualified Data.Attoparsec.Text           as AT
-import qualified Data.Text                      as T
-import           Data.Maybe
-import           Test.Framework.Providers.HUnit (testCase)
-import           Test.HUnit                     (Assertion, assert)
+import           Pipes
+import qualified Pipes.Lift                         as P
+import qualified Pipes.Prelude                      as P
+import           Control.Monad.Trans.Error          (runErrorT)
+import           Control.Monad.Trans.Writer.Strict  (runWriterT, tell)
+import           Pipes.Attoparsec                   (parseMany)
+import qualified Data.Attoparsec.Text               as AT
+import           Data.Functor.Identity              (runIdentity)
+import qualified Data.Text                          as T
+import           Test.Framework.Providers.HUnit     (testCase)
+import           Test.HUnit                         (Assertion, assert)
 
 -- | Parses a 'Char' repeated four times.
 four :: AT.Parser Char
@@ -28,13 +27,14 @@ type ParseTest = (Bool, String, [T.Text], [Char], [T.Text])
 
 
 assertFoursTest :: ParseTest -> Assertion
-assertFoursTest (ok, _title, input, output, mlo) = assert . fromJust $ do
-  let srcS = (Pa.wrap.) $ P.fromListS input
-      run = P.runProxy . P.runWriterK . P.runStateK Pa.mempty . P.runEitherK
-  ((epe,mlo'), res) <- run $ srcS >-> parseD four
-                                  >-> P.liftP . P.liftP . P.toListD
+assertFoursTest (ok, _title, input, output, mlo) = assert . runIdentity $ do
+  (e,res) <- runWriterT . runErrorT . P.toListM $
+                for (P.errorP $ parseMany four $ each input)
+                    (\a -> lift . lift $ tell [snd a])
+  let (okErr,mlo') = case e of
+       Left (_, pmlo') -> (not ok, runIdentity . P.toListM . fmap fst $ P.runWriterP pmlo')
+       Right _         -> (ok, [])
   let okMlo = mlo' == mlo
-      okErr = either (const $ not ok) (const $ ok) epe
       okRes = res == output
   return $ okMlo && okErr && okRes
 
@@ -56,7 +56,7 @@ foursTests =
   , (True  ,"2 chunk: One''"            ,["aaa","a"]        ,['a']     ,[])
   , (True  ,"2 chunk: One'''"           ,["aaaa",""]        ,['a']     ,[])
   , (True  ,"2 chunk: Two"              ,["aaaa","bbbb"]    ,['a','b'] ,[])
-  , (False ,"2 chunk: Wrong"            ,["abcd","efgh"]    ,[]        ,["bcd"])
+  , (False ,"2 chunk: Wrong"            ,["abcd","efgh"]    ,[]        ,["bcd","efgh"])
   , (False ,"2 chunk: One then wrong"   ,["aaaab","bxz"]    ,['a']     ,["xz"])
   , (True  ,"3 chunk: One"              ,["a","a","aa"]     ,['a']     ,[])
   ]
