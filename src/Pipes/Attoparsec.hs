@@ -1,11 +1,11 @@
 {-# Language RankNTypes #-}
 
--- | This module allows you to run Attoparsec parsers on input flowing
--- downstream through pipes, possibly interleaving other stream effects
+-- | The utilities in this module allow you to run Attoparsec parsers on input
+-- flowing downstream through pipes, possibly interleaving other stream effects
 -- while doing so.
 --
--- This module builds on top of the @pipes@ and @pipes-parse@ package and
--- assumes you understand how to use those libraries.
+-- This module builds on top of the @attoparsec@, @pipes@ and @pipes-parse@
+-- package and assumes you understand how to use those libraries.
 
 module Pipes.Attoparsec
   ( -- * Parsing
@@ -53,7 +53,8 @@ parse attoparser = do
 --
 -- This 'Producer' runs until it either runs out of input or until a parsing
 -- failure occurs, in which case it returns 'Left' with a 'I.ParsingError' and a
--- 'Producer' with any leftovers.
+-- 'Producer' with any leftovers. You can use 'P.errorP' to turn the 'Either'
+-- return value into an 'Control.Monad.Trans.Error.ErrorT' monad transformer.
 parseMany
   :: (Monad m, I.ParserInput a)
   => Parser a b       -- ^Attoparsec parser.
