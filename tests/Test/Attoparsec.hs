@@ -32,7 +32,7 @@ assertFoursTest (ok, _title, input, output, mlo) = assert . runIdentity $ do
                 for (P.errorP $ parseMany four $ each input)
                     (\a -> lift . lift $ tell [snd a])
   let (okErr,mlo') = case e of
-       Left (_, pmlo') -> (not ok, runIdentity . P.toListM . fmap fst $ P.runWriterP pmlo')
+       Left (_, pmlo') -> (not ok, P.toList . fmap fst $ P.runWriterP pmlo')
        Right _         -> (ok, [])
   let okMlo = mlo' == mlo
       okRes = res == output
