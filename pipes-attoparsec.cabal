@@ -30,11 +30,11 @@ library
   other-modules:   Pipes.Attoparsec.Internal
   build-depends:
       base         (==4.*)
-    , pipes        (>=4.0 && <4.1)
-    , pipes-parse  (>=2.0 && <2.1)
     , attoparsec   (>=0.10 && <0.11)
     , bytestring   (>=0.9.2.1)
-    , text
+    , pipes        (>=4.0 && <4.1)
+    , pipes-parse  (>=2.0 && <2.1)
+    , text         (>=0.11.2.3)
     , transformers (>=0.2 && <=0.4)
   ghc-options: -Wall -O2
 
@@ -47,12 +47,13 @@ test-suite tests
 
   build-depends:
       base
+    , attoparsec
     , mmorph
     , pipes
-    , attoparsec
-    , text
     , pipes-attoparsec
     , pipes-parse
+    , text
+    , transformers
     , QuickCheck                 (== 2.*)
     , HUnit                      (== 1.*)
     , test-framework             (>= 0.6)
