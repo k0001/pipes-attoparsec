@@ -62,23 +62,22 @@ parseMany
 parseMany attoparser src = do
     (me, src') <- P.runStateP src go
     return $ case me of
-      Left e  -> Left  (e, src')
+      Left  e -> Left  (e, src')
       Right r -> Right r
   where
     go = do
         eof <- lift isEndOfParserInput
         if eof
-          then done
+          then do
+            ra <- lift Pp.draw
+            case ra of
+              Left  r -> return (Right r)
+              Right _ -> error "parseMany: The impossible happened!"
           else do
             eb <- lift (parse attoparser)
             case eb of
               Left  e -> return (Left e)
               Right b -> yield b >> go
-    done = do
-        ra <- lift Pp.draw
-        case ra of
-          Left r  -> return (Right r)
-          Right _ -> error "parseMany: The impossible happened!"
 
 --------------------------------------------------------------------------------
 
