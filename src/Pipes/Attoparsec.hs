@@ -73,7 +73,7 @@ parseMany attoparser src = do
             ra <- lift Pp.draw
             case ra of
               Left  r -> return (Right r)
-              Right _ -> error "parseMany: The impossible happened!"
+              Right _ -> error "Pipes.Attoparsec.parseMany: impossible!!"
           else do
             eb <- lift (parse attoparser)
             case eb of
