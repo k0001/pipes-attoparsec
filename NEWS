@@ -1,4 +1,4 @@
-# Version HEAD
+# Version 0.3.0
 
 * Upgrade to pipes-4.0.0 and pipes-parse-2.0.0, removing proxy
   transformers and changing the API substantially.
