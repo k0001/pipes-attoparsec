@@ -5,7 +5,7 @@
 -- while doing so.
 --
 -- This module builds on top of the @attoparsec@, @pipes@ and @pipes-parse@
--- package and assumes you understand how to use those libraries.
+-- libraries and assumes you understand how to use those.
 
 module Pipes.Attoparsec
   ( -- * Parsing
@@ -51,7 +51,7 @@ parse attoparser = do
 -- sending downstream pairs of each successfully parsed entity together with the
 -- length of input consumed in order to produce it.
 --
--- This 'Producer' runs until it either runs out of input or until a parsing
+-- This 'Producer' runs until it either runs out of input or a parsing
 -- failure occurs, in which case it returns 'Left' with a 'I.ParsingError' and a
 -- 'Producer' with any leftovers. You can use 'P.errorP' to turn the 'Either'
 -- return value into an 'Control.Monad.Trans.Error.ErrorT' monad transformer.
