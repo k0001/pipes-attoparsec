@@ -13,6 +13,7 @@ module Pipes.Attoparsec.Internal
   , ParserInput
     -- * Parsing
   , parseWithDraw
+  , parseWithRaw
   ) where
 
 --------------------------------------------------------------------------------

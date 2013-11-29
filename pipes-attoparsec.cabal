@@ -27,7 +27,7 @@ source-repository head
 library
   hs-source-dirs:  src
   exposed-modules: Pipes.Attoparsec
-  other-modules:   Pipes.Attoparsec.Internal
+                 , Pipes.Attoparsec.Internal
   build-depends:
       base         (==4.*)
     , attoparsec   (>=0.10 && <0.11)
