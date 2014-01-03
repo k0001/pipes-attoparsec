@@ -1,98 +1,114 @@
-{-# Language RankNTypes #-}
+-- | @pipes@ utilities for incrementally running @attoparsec@-based parsers
 
--- | The utilities in this module allow you to run Attoparsec parsers on input
--- flowing downstream through pipes, possibly interleaving other stream effects
--- while doing so.
---
--- This module builds on top of the @attoparsec@, @pipes@ and @pipes-parse@
--- libraries and assumes you understand how to use those.
+{-# LANGUAGE DeriveDataTypeable #-}
 
-module Pipes.Attoparsec
-  ( -- * Parsing
-    parse
-  , parseMany
-  , isEndOfParserInput
+module Pipes.Attoparsec (
+    -- * Parsing
+      parse
+    , parsed
+    , isEndOfParserInput
+
     -- * Types
-  , I.ParserInput
-  , I.ParsingError(..)
-  ) where
+    , ParserInput(..)
+    , ParsingError(..)
+    ) where
 
---------------------------------------------------------------------------------
+import Control.Exception (Exception)
+import Control.Monad.Trans.Error (Error)
+import Data.Attoparsec.Types (IResult(..))
+import qualified Data.Attoparsec.Types as Attoparsec
+import qualified Data.Attoparsec.ByteString
+import qualified Data.Attoparsec.Text
+import Data.ByteString (ByteString)
+import qualified Data.ByteString
+import Data.Data (Data, Typeable)
+import Data.Monoid (Monoid(mempty))
+import Data.Text (Text)
+import qualified Data.Text
+import Pipes ((>->))
+import qualified Pipes.Parse as Pipes
+import Pipes.Parse
+import qualified Pipes.Prelude as P
 
-import           Pipes
-import qualified Pipes.Parse                       as Pp
-import qualified Pipes.Lift                        as P
-import qualified Pipes.Attoparsec.Internal         as I
-import qualified Control.Monad.Trans.State.Strict  as S
-import           Data.Attoparsec.Types             (Parser)
-import           Data.Monoid                       (Monoid(mempty))
-
---------------------------------------------------------------------------------
-
--- | Run an Attoparsec 'Parser' on input from the underlying 'Producer',
--- returning either a 'I.ParsingError' on failure, or a pair with the parsed
--- entity together with the length of input consumed in order to produce it.
---
--- Use this function only if 'isEndOfParserInput' returns 'False', otherwise
--- you'll get unexpected parsing errors.
+-- | Convert an @attoparsec@ parser to a @pipes-parse@ parser
 parse
-  :: (Monad m, I.ParserInput a)
-  => Parser a b  -- ^Attoparsec parser.
-  -> S.StateT (Producer a m r) m (Either I.ParsingError (Int, b))
-parse attoparser = do
-    (eb, mlo) <- I.parseWithDraw attoparser
-    case mlo of
-      Just lo -> Pp.unDraw lo
-      Nothing -> return ()
-    return eb
+    :: (Monad m, ParserInput t)
+    => Attoparsec.Parser t a
+    -- ^ 
+    -> Pipes.Parser t m (Either ParsingError a)
+    -- ^
+parse parser = StateT $ \p -> do
+    x <- next (p >-> P.filter (/= mempty))
+    case x of
+        Left   e      -> go id (_parse parser mempty) (return e)
+        Right (t, p') -> go (yield t >>) (_parse parser t     ) p'
+  where
+    go diffP iResult p = case iResult of
+        Fail _ ctxs msg -> return (Left (ParsingError ctxs msg), diffP p)
+        Partial k           -> do
+            x <- next p
+            case x of
+                Left   e      -> go diffP (k mempty) (return e)
+                Right (t, p') -> go (diffP . (yield t >>)) (k t) p'
+        Done t r            -> return (Right r, yield t >> p)
 {-# INLINABLE parse #-}
 
--- | Continuously run an Attoparsec 'Parser' on input from the given 'Producer',
--- sending downstream pairs of each successfully parsed entity together with the
--- length of input consumed in order to produce it.
---
--- This 'Producer' runs until it either runs out of input or a parsing
--- failure occurs, in which case it returns 'Left' with a 'I.ParsingError' and a
--- 'Producer' with any leftovers. You can use 'P.errorP' to turn the 'Either'
--- return value into an 'Control.Monad.Trans.Error.ErrorT' monad transformer.
-parseMany
-  :: (Monad m, I.ParserInput a)
-  => Parser a b       -- ^Attoparsec parser.
-  -> Producer a m r   -- ^Producer from which to draw input.
-  -> Producer' (Int, b) m (Either (I.ParsingError, Producer a m r) r)
-parseMany attoparser src = do
-    (me, src') <- P.runStateP src go
-    return $ case me of
-      Left  e -> Left  (e, src')
-      Right r -> Right r
+-- | Convert a stream of 'ParserInput' to a stream of parsed values
+parsed
+    :: (Monad m, ParserInput t)
+    => Attoparsec.Parser t a
+    -- ^
+    -> Producer t m e
+    -- ^
+    -> Producer a m (ParsingError, Producer t m e)
+    -- ^
+parsed parser = go
+  where
+    go p = do
+        (x, p') <- lift $ runStateT (parse parser) p
+        case x of
+            Left err -> return (err, p')
+            Right a  -> do
+                yield a
+                go p'
+{-# INLINABLE parsed #-}
+
+{-| Like 'Pipes.Parse.isEndOfInput', except that it also consumes and discards
+    leading empty chunks
+-}
+isEndOfParserInput :: (Monad m, ParserInput t) => Parser t m Bool
+isEndOfParserInput = go
   where
     go = do
-        eof <- lift isEndOfParserInput
-        if eof
-          then do
-            ra <- lift Pp.draw
-            case ra of
-              Left  r -> return (Right r)
-              Right _ -> error "Pipes.Attoparsec.parseMany: impossible!!"
-          else do
-            eb <- lift (parse attoparser)
-            case eb of
-              Left  e -> return (Left e)
-              Right b -> yield b >> go
-
---------------------------------------------------------------------------------
-
--- | Like 'P.isEndOfInput', except it also consumes and discards leading
--- empty 'I.ParserInput' chunks.
-isEndOfParserInput
-  :: (I.ParserInput a, Monad m)
-  => S.StateT (Producer a m r) m Bool
-isEndOfParserInput = do
-    ma <- Pp.draw
-    case ma of
-      Left  _         -> return True
-      Right a
-        | a == mempty -> isEndOfParserInput
-        | otherwise   -> Pp.unDraw a >> return False
+        mt <- draw
+        case mt of
+            Nothing -> return True
+            Just a  ->
+                if a == mempty
+                then go
+                else do
+                    unDraw a
+                    return False
 {-# INLINABLE isEndOfParserInput #-}
 
+-- | A class for valid @attoparsec@ input types
+class (Eq a, Monoid a) => ParserInput a where
+    _parse  :: Attoparsec.Parser a b -> a -> IResult a b
+    _length :: a -> Int
+
+instance ParserInput ByteString where
+    _parse  = Data.Attoparsec.ByteString.parse
+    _length = Data.ByteString.length
+
+instance ParserInput Text where
+    _parse  = Data.Attoparsec.Text.parse
+    _length = Data.Text.length
+
+-- | A parsing error report, as provided by Attoparsec's 'Fail'.
+data ParsingError = ParsingError
+    { peContexts :: [String]  -- ^ Contexts where the parsing error occurred.
+    , peMessage  ::  String   -- ^ Parsing error description message.
+    } deriving (Show, Read, Eq, Data, Typeable)
+
+instance Exception ParsingError
+instance Error     ParsingError
