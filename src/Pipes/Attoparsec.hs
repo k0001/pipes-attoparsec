@@ -8,6 +8,10 @@ module Pipes.Attoparsec (
     , parsed
     , isEndOfParserInput
 
+    -- * Length Offsets
+    , parseL
+    , parsedL
+
     -- * Types
     , ParserInput(..)
     , ParsingError(..)
@@ -37,20 +41,11 @@ parse
     -- ^ 
     -> Pipes.Parser t m (Either ParsingError a)
     -- ^
-parse parser = StateT $ \p -> do
-    x <- next (p >-> P.filter (/= mempty))
-    case x of
-        Left   e      -> go id (_parse parser mempty) (return e)
-        Right (t, p') -> go (yield t >>) (_parse parser t     ) p'
-  where
-    go diffP iResult p = case iResult of
-        Fail _ ctxs msg -> return (Left (ParsingError ctxs msg), diffP p)
-        Partial k           -> do
-            x <- next p
-            case x of
-                Left   e      -> go diffP (k mempty) (return e)
-                Right (t, p') -> go (diffP . (yield t >>)) (k t) p'
-        Done t r            -> return (Right r, yield t >> p)
+parse parser = do
+    x <- parseL parser
+    return $ case x of
+        Left   e     -> Left e
+        Right (_, a) -> Right a
 {-# INLINABLE parse #-}
 
 -- | Convert a stream of 'ParserInput' to a stream of parsed values
@@ -67,9 +62,57 @@ parsed parser = go
     go p = do
         (x, p') <- lift $ runStateT (parse parser) p
         case x of
-            Left err -> return (err, p')
-            Right a  -> do
+            Left   err -> return (err, p')
+            Right  a   -> do
                 yield a
+                go p'
+{-# INLINABLE parsedL #-}
+
+{-| Like 'parse', but also returns the length of input consumed to parse the
+    value
+-}
+parseL
+    :: (Monad m, ParserInput t)
+    => Attoparsec.Parser t a
+    -- ^ 
+    -> Pipes.Parser t m (Either ParsingError (Int, a))
+    -- ^
+parseL parser = StateT $ \p -> do
+    x <- next (p >-> P.filter (/= mempty))
+    case x of
+        Left   e      -> go id (_parse parser mempty) (return e) 0
+        Right (t, p') -> go (yield t >>) (_parse parser t     ) p' $! _length t
+  where
+    go diffP iResult p len = case iResult of
+        Fail _ ctxs msg -> return (Left (ParsingError ctxs msg), diffP p)
+        Partial k       -> do
+            x <- next p
+            case x of
+                Left   e      -> go diffP (k mempty) (return e) len
+                Right (t, p') ->
+                    go (diffP . (yield t >>)) (k t) p' $! len + _length t
+        Done t r        -> return (Right (len - _length t, r), yield t >> p)
+{-# INLINABLE parseL #-}
+
+{-| Like 'parsed', except this tags each parsed value with the length of input
+    consumed to parse the value
+-}
+parsedL
+    :: (Monad m, ParserInput t)
+    => Attoparsec.Parser t a
+    -- ^
+    -> Producer t m e
+    -- ^
+    -> Producer (Int, a) m (ParsingError, Producer t m e)
+    -- ^
+parsedL parser = go
+  where
+    go p = do
+        (x, p') <- lift $ runStateT (parseL parser) p
+        case x of
+            Left   err -> return (err, p')
+            Right  r   -> do
+                yield r
                 go p'
 {-# INLINABLE parsed #-}
 
