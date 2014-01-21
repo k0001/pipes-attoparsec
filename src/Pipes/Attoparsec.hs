@@ -53,9 +53,9 @@ parsed
     :: (Monad m, ParserInput t)
     => Attoparsec.Parser t a
     -- ^
-    -> Producer t m e
+    -> Producer t m r
     -- ^
-    -> Producer a m (ParsingError, Producer t m e)
+    -> Producer a m (ParsingError, Producer t m r)
     -- ^
 parsed parser = go
   where
@@ -101,9 +101,9 @@ parsedL
     :: (Monad m, ParserInput t)
     => Attoparsec.Parser t a
     -- ^
-    -> Producer t m e
+    -> Producer t m r
     -- ^
-    -> Producer (Int, a) m (ParsingError, Producer t m e)
+    -> Producer (Int, a) m (ParsingError, Producer t m r)
     -- ^
 parsedL parser = go
   where
