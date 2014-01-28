@@ -1,6 +1,7 @@
 -- | @pipes@ utilities for incrementally running @attoparsec@-based parsers
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Pipes.Attoparsec (
     -- * Parsing
@@ -66,7 +67,7 @@ parsed parser = go
             Right  a   -> do
                 yield a
                 go p'
-{-# INLINABLE parsedL #-}
+{-# INLINABLE parsed #-}
 
 {-| Like 'parse', but also returns the length of input consumed to parse the
     value
@@ -114,7 +115,7 @@ parsedL parser = go
             Right  r   -> do
                 yield r
                 go p'
-{-# INLINABLE parsed #-}
+{-# INLINABLE parsedL #-}
 
 {-| Like 'Pipes.Parse.isEndOfInput', except that it also consumes and discards
     leading empty chunks
