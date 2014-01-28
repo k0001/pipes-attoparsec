@@ -1,19 +1,22 @@
 module Main (main) where
 
-import Test.Framework (defaultMain, testGroup)
-import Test.Framework.Providers.QuickCheck2 (testProperty)
-import Test.Framework.Providers.HUnit (testCase)
 import Test.HUnit
 
+import qualified Test.Tasty                       as Tasty
+import           Test.Tasty.HUnit                 (testCase)
+import           Test.Tasty.QuickCheck            (testProperty)
 import qualified Test.Attoparsec
 
-main = defaultMain tests
+main :: IO ()
+main = Tasty.defaultMain tests
 
-tests =
-    [ testGroup "Sample."   sampleTests
-    , testGroup "Attoparsec." Test.Attoparsec.tests
+tests :: Tasty.TestTree
+tests = Tasty.testGroup "root"
+    [ Tasty.testGroup "Sample."   sampleTests
+    , Tasty.testGroup "Attoparsec." Test.Attoparsec.tests
     ]
 
+sampleTests :: [Tasty.TestTree]
 sampleTests = [ testProperty "QuickCheck" $ \x -> const True (x :: Int) == True
               , testCase     "HUnit"      $ True @?= True
               ]

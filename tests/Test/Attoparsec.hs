@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Test.Attoparsec (tests) where
 
@@ -13,7 +14,7 @@ import           Pipes.Attoparsec                   (parseMany)
 import qualified Data.Attoparsec.Text               as AT
 import           Data.Functor.Identity              (runIdentity)
 import qualified Data.Text                          as T
-import           Test.Framework.Providers.HUnit     (testCase)
+import           Test.Tasty.HUnit                   (testCase)
 import           Test.HUnit                         (Assertion, assert)
 
 -- | Parses a 'Char' repeated four times.
