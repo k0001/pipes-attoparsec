@@ -4,18 +4,18 @@
 
 module Test.Attoparsec (tests) where
 
-import           Control.Monad
-import           Pipes
-import qualified Pipes.Lift                         as P
-import qualified Pipes.Prelude                      as P
-import           Control.Monad.Trans.Error          (runErrorT)
-import           Control.Monad.Trans.Writer.Strict  (runWriterT, tell)
-import           Pipes.Attoparsec                   (parseMany)
-import qualified Data.Attoparsec.Text               as AT
-import           Data.Functor.Identity              (runIdentity)
-import qualified Data.Text                          as T
-import           Test.Tasty.HUnit                   (testCase)
-import           Test.HUnit                         (Assertion, assert)
+import Control.Monad (replicateM_)
+import Data.Maybe (isNothing)
+import Data.Text (Text)
+import Data.Functor.Identity (runIdentity)
+import Control.Monad.Trans.Writer.Strict  (runWriterT, tell)
+import qualified Data.Attoparsec.Text as AT
+import Pipes
+import Pipes.Prelude (toListM)
+import Test.Tasty (TestTree)
+import Test.Tasty.HUnit (testCase)
+import Test.HUnit (Assertion, assert)
+import Pipes.Attoparsec (parsed)
 
 -- | Parses a 'Char' repeated four times.
 four :: AT.Parser Char
@@ -24,20 +24,22 @@ four = do
    replicateM_ 3 $ AT.char c
    return c
 
-type ParseTest = (Bool, String, [T.Text], [Char], [T.Text])
-
+type ParseTest = (Bool, String, [Text], [Char], [Text])
 
 assertFoursTest :: ParseTest -> Assertion
-assertFoursTest (ok, _title, input, output, mlo) = assert . runIdentity $ do
-  (e,res) <- runWriterT . runErrorT . P.toListM $
-                for (P.errorP $ parseMany four $ each input)
-                    (\a -> lift . lift $ tell [snd a])
-  let (okErr,mlo') = case e of
-       Left (_, pmlo') -> (not ok, P.toList . fmap fst $ P.runWriterP pmlo')
-       Right _         -> (ok, [])
-  let okMlo = mlo' == mlo
-      okRes = res == output
-  return $ okMlo && okErr && okRes
+assertFoursTest (ok, _title, input, output, mlo) =
+    assert $ res == output
+          && isNothing e == ok
+          && mlo' == mlo
+  where
+    (e, res) = runIdentity . runWriterT . runEffect
+             $ for (parsed four $ each input)
+                   (\c -> lift $ tell [c])
+    mlo' = case e of
+               Nothing -> []
+               Just (_,pmlo') -> fst . runIdentity
+                                     . runWriterT
+                                     $ toListM pmlo'
 
 foursTests :: [ParseTest]
 foursTests =
@@ -47,9 +49,9 @@ foursTests =
   , (True  ,"1 chunk: One twice"        ,["aaaaaaaa"]       ,['a','a'] ,[])
   , (True  ,"1 chunk: Two"              ,["aaaabbbb"]       ,['a','b'] ,[])
   , (True  ,"1 chunk: Two between null" ,["aaaa","","bbbb"] ,['a','b'] ,[])
-  , (False ,"1 chunk: Partial"          ,["aaaab"]          ,['a']     ,[])
-  , (False ,"1 chunk: Wrong"            ,["aaxbb"]          ,[]        ,["xbb"])
-  , (False ,"1 chunk: One then wrong"   ,["aaaavz"]         ,['a']     ,["z"])
+  , (False ,"1 chunk: Partial"          ,["aaaab"]          ,['a']     ,["b"])
+  , (False ,"1 chunk: Wrong"            ,["aaxbb"]          ,[]        ,["aaxbb"])
+  , (False ,"1 chunk: One then wrong"   ,["aaaavz"]         ,['a']     ,["vz"])
   , (True  ,"2 chunk: Empty"            ,["",""]            ,[]        ,[])
   , (True  ,"2 chunk: Empty then one"   ,["","aaaa"]        ,['a']     ,[])
   , (True  ,"2 chunk: One"              ,["a","aaa"]        ,['a']     ,[])
@@ -57,12 +59,14 @@ foursTests =
   , (True  ,"2 chunk: One''"            ,["aaa","a"]        ,['a']     ,[])
   , (True  ,"2 chunk: One'''"           ,["aaaa",""]        ,['a']     ,[])
   , (True  ,"2 chunk: Two"              ,["aaaa","bbbb"]    ,['a','b'] ,[])
-  , (False ,"2 chunk: Wrong"            ,["abcd","efgh"]    ,[]        ,["bcd","efgh"])
-  , (False ,"2 chunk: One then wrong"   ,["aaaab","bxz"]    ,['a']     ,["xz"])
+  , (False ,"2 chunk: Wrong"            ,["abcd","efgh"]    ,[]        ,["abcd","efgh"])
+  , (False ,"2 chunk: One then wrong"   ,["aaaab","bxz"]    ,['a']     ,["b","bxz"])
   , (True  ,"3 chunk: One"              ,["a","a","aa"]     ,['a']     ,[])
   ]
 
+testCaseFoursTest :: (Bool, [Char], [Text], [Char], [Text]) -> TestTree
 testCaseFoursTest ft@(_,name,_,_,_) =
   testCase ("Fours." ++ name) $ assertFoursTest ft
 
+tests :: [TestTree]
 tests = map testCaseFoursTest foursTests
