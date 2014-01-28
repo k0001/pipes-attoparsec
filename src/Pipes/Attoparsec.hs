@@ -56,17 +56,18 @@ parsed
     -- ^
     -> Producer t m r
     -- ^
-    -> Producer a m (ParsingError, Producer t m r)
+    -> Producer a m (Maybe (ParsingError, Producer t m r))
     -- ^
 parsed parser = go
   where
     go p = do
-        (x, p') <- lift $ runStateT (parse parser) p
-        case x of
-            Left   err -> return (err, p')
-            Right  a   -> do
-                yield a
-                go p'
+        finished <- lift $ evalStateT isEndOfParserInput p
+        if finished
+           then return Nothing
+           else do (x, p') <- lift $ runStateT (parse parser) p
+                   case x of
+                       Left   err -> return $ Just (err, p')
+                       Right  a   -> yield a >> go p'
 {-# INLINABLE parsed #-}
 
 {-| Like 'parse', but also returns the length of input consumed to parse the
@@ -98,23 +99,25 @@ parseL parser = StateT $ \p -> do
 {-| Like 'parsed', except this tags each parsed value with the length of input
     consumed to parse the value
 -}
+-- TODO: Refactor with 'parsed'
 parsedL
     :: (Monad m, ParserInput t)
     => Attoparsec.Parser t a
     -- ^
     -> Producer t m r
     -- ^
-    -> Producer (Int, a) m (ParsingError, Producer t m r)
+    -> Producer (Int, a) m (Maybe (ParsingError, Producer t m r))
     -- ^
 parsedL parser = go
   where
     go p = do
-        (x, p') <- lift $ runStateT (parseL parser) p
-        case x of
-            Left   err -> return (err, p')
-            Right  r   -> do
-                yield r
-                go p'
+        finished <- lift $ evalStateT isEndOfParserInput p
+        if finished
+           then return Nothing
+           else do (x, p') <- lift $ runStateT (parseL parser) p
+                   case x of
+                       Left   err -> return $ Just (err, p')
+                       Right  a   -> yield a >> go p'
 {-# INLINABLE parsedL #-}
 
 {-| Like 'Pipes.Parse.isEndOfInput', except that it also consumes and discards
