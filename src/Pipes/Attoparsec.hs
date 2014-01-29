@@ -19,18 +19,18 @@ module Pipes.Attoparsec (
     ) where
 
 import Control.Exception (Exception)
+import Data.Data (Data, Typeable)
+import Data.Monoid (Monoid(mempty))
+import Data.ByteString (ByteString)
+import Data.Text (Text)
 import Control.Monad.Trans.Error (Error)
 import Data.Attoparsec.Types (IResult(..))
 import qualified Data.Attoparsec.Types as Attoparsec
 import qualified Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.Text
-import Data.ByteString (ByteString)
 import qualified Data.ByteString
-import Data.Data (Data, Typeable)
-import Data.Monoid (Monoid(mempty))
-import Data.Text (Text)
 import qualified Data.Text
-import Pipes ((>->))
+import Pipes ((>->), for)
 import qualified Pipes.Parse as Pipes
 import Pipes.Parse
 import qualified Pipes.Prelude as P
@@ -39,9 +39,7 @@ import qualified Pipes.Prelude as P
 parse
     :: (Monad m, ParserInput t)
     => Attoparsec.Parser t a
-    -- ^ 
     -> Pipes.Parser t m (Either ParsingError a)
-    -- ^
 parse parser = do
     x <- parseL parser
     return $ case x of
@@ -49,17 +47,20 @@ parse parser = do
         Right (_, a) -> Right a
 {-# INLINABLE parse #-}
 
--- | Convert a stream of 'ParserInput' to a stream of parsed values
+{-| Convert a stream of 'ParserInput' to a producer of parsed values. This
+    producer returns 'Nothing' when end-of-input is reached successfully,
+    otherwise it returns a 'ParsingError' and the leftovers. The leftovers
+    include any input that it was in the process of being parsed.
+-}
 parsed
     :: (Monad m, ParserInput t)
     => Attoparsec.Parser t a
-    -- ^
     -> Producer t m r
-    -- ^
     -> Producer a m (Maybe (ParsingError, Producer t m r))
     -- ^
 parsed parser p = for (parsedL parser p) (yield . snd)
 {-# INLINABLE parsed #-}
+
 
 {-| Like 'parse', but also returns the length of input consumed to parse the
     value
@@ -67,9 +68,7 @@ parsed parser p = for (parsedL parser p) (yield . snd)
 parseL
     :: (Monad m, ParserInput t)
     => Attoparsec.Parser t a
-    -- ^ 
     -> Pipes.Parser t m (Either ParsingError (Int, a))
-    -- ^
 parseL parser = StateT $ \p -> do
     x <- next (p >-> P.filter (/= mempty))
     case x of

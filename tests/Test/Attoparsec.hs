@@ -1,6 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NoMonomorphismRestriction #-}
-{-# LANGUAGE RankNTypes #-}
 
 module Test.Attoparsec (tests) where
 
@@ -10,7 +8,7 @@ import Data.Text (Text)
 import Data.Functor.Identity (runIdentity)
 import Control.Monad.Trans.Writer.Strict  (runWriterT, tell)
 import qualified Data.Attoparsec.Text as AT
-import Pipes
+import Pipes (for, each, lift, runEffect)
 import Pipes.Prelude (toListM)
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (testCase)
