@@ -58,16 +58,7 @@ parsed
     -- ^
     -> Producer a m (Maybe (ParsingError, Producer t m r))
     -- ^
-parsed parser = go
-  where
-    go p = do
-        finished <- lift $ evalStateT isEndOfParserInput p
-        if finished
-           then return Nothing
-           else do (x, p') <- lift $ runStateT (parse parser) p
-                   case x of
-                       Left   err -> return $ Just (err, p')
-                       Right  a   -> yield a >> go p'
+parsed parser p = for (parsedL parser p) (yield . snd)
 {-# INLINABLE parsed #-}
 
 {-| Like 'parse', but also returns the length of input consumed to parse the
@@ -99,7 +90,6 @@ parseL parser = StateT $ \p -> do
 {-| Like 'parsed', except this tags each parsed value with the length of input
     consumed to parse the value
 -}
--- TODO: Refactor with 'parsed'
 parsedL
     :: (Monad m, ParserInput t)
     => Attoparsec.Parser t a
