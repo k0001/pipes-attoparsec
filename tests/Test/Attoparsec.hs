@@ -2,17 +2,17 @@
 
 module Test.Attoparsec (tests) where
 
-import Control.Monad (replicateM_)
-import Data.Text (Text)
-import Data.Functor.Identity (runIdentity)
-import Control.Monad.Trans.Writer.Strict  (runWriterT, tell)
-import qualified Data.Attoparsec.Text as AT
-import Pipes (for, each, lift, runEffect)
-import Pipes.Prelude (toListM)
-import Test.Tasty (TestTree)
-import Test.Tasty.HUnit (testCase)
-import Test.HUnit (Assertion, assert)
-import Pipes.Attoparsec (parsed)
+import           Control.Monad                     (replicateM_)
+import           Control.Monad.Trans.Writer.Strict (runWriterT, tell)
+import qualified Data.Attoparsec.Text              as AT
+import           Data.Functor.Identity             (runIdentity)
+import           Data.Text                         (Text)
+import           Pipes                             (each, for, lift, runEffect)
+import           Pipes.Attoparsec                  (parsed)
+import           Pipes.Prelude                     (toListM)
+import           Test.HUnit                        (Assertion, assert)
+import           Test.Tasty                        (TestTree)
+import           Test.Tasty.HUnit                  (testCase)
 
 -- | Parses a 'Char' repeated four times.
 four :: AT.Parser Char
