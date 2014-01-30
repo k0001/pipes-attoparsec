@@ -3,7 +3,6 @@
 module Test.Attoparsec (tests) where
 
 import Control.Monad (replicateM_)
-import Data.Maybe (isNothing)
 import Data.Text (Text)
 import Data.Functor.Identity (runIdentity)
 import Control.Monad.Trans.Writer.Strict  (runWriterT, tell)
@@ -27,17 +26,17 @@ type ParseTest = (Bool, String, [Text], [Char], [Text])
 assertFoursTest :: ParseTest -> Assertion
 assertFoursTest (ok, _title, input, output, mlo) =
     assert $ res == output
-          && isNothing e == ok
+          && isLeft e == ok
           && mlo' == mlo
   where
     (e, res) = runIdentity . runWriterT . runEffect
              $ for (parsed four $ each input)
                    (\c -> lift $ tell [c])
     mlo' = case e of
-               Nothing -> []
-               Just (_,pmlo') -> fst . runIdentity
-                                     . runWriterT
-                                     $ toListM pmlo'
+               Left _ -> []
+               Right (_,pmlo') -> fst . runIdentity
+                                      . runWriterT
+                                      $ toListM pmlo'
 
 foursTests :: [ParseTest]
 foursTests =
@@ -68,3 +67,7 @@ testCaseFoursTest ft@(_,name,_,_,_) =
 
 tests :: [TestTree]
 tests = map testCaseFoursTest foursTests
+
+isLeft :: Either a b -> Bool
+isLeft (Left _) = True
+isLeft _        = False
