@@ -26,17 +26,17 @@ type ParseTest = (Bool, String, [Text], [Char], [Text])
 assertFoursTest :: ParseTest -> Assertion
 assertFoursTest (ok, _title, input, output, mlo) =
     assert $ res == output
-          && isLeft e == ok
+          && isRight e == ok
           && mlo' == mlo
   where
     (e, res) = runIdentity . runWriterT . runEffect
              $ for (parsed four $ each input)
                    (\c -> lift $ tell [c])
     mlo' = case e of
-               Left _ -> []
-               Right (_,pmlo') -> fst . runIdentity
-                                      . runWriterT
-                                      $ toListM pmlo'
+               Right _ -> []
+               Left (_,pmlo') -> fst . runIdentity
+                                     . runWriterT
+                                     $ toListM pmlo'
 
 foursTests :: [ParseTest]
 foursTests =
@@ -68,6 +68,6 @@ testCaseFoursTest ft@(_,name,_,_,_) =
 tests :: [TestTree]
 tests = map testCaseFoursTest foursTests
 
-isLeft :: Either a b -> Bool
-isLeft (Left _) = True
-isLeft _        = False
+isRight :: Either a b -> Bool
+isRight (Right _) = True
+isRight _         = False

@@ -62,7 +62,7 @@ parsed
   :: (Monad m, ParserInput a)
   => Attoparsec.Parser a b  -- ^ Attoparsec parser
   -> Producer a m r
-  -> Producer b m (Either r (ParsingError, Producer a m r))
+  -> Producer b m (Either (ParsingError, Producer a m r) r)
 parsed parser p = for (parsedL parser p) (yield . snd)
 {-# INLINABLE parsed #-}
 
@@ -97,16 +97,16 @@ parsedL
     :: (Monad m, ParserInput a)
     => Attoparsec.Parser a b    -- ^ Attoparsec parser
     -> Producer a m r
-    -> Producer (Int, b) m (Either r (ParsingError, Producer a m r))
+    -> Producer (Int, b) m (Either (ParsingError, Producer a m r) r)
 parsedL parser = go where
     go p0 = do
       mr <- lift $ S.evalStateT isEndOfParserInput' p0
       case mr of
-         Just r  -> return (Left r)
+         Just r  -> return (Right r)
          Nothing -> do
             (x, p1) <- lift $ S.runStateT (parseL parser) p0
             case x of
-               Left  e -> return (Right (e, p1))
+               Left  e -> return (Left (e, p1))
                Right a -> yield a >> go p1
 {-# INLINABLE parsedL #-}
 
