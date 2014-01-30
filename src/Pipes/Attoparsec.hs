@@ -14,7 +14,7 @@ module Pipes.Attoparsec (
     , parsedL
 
     -- * Types
-    , ParserInput(..)
+    , ParserInput
     , ParsingError(..)
     ) where
 
