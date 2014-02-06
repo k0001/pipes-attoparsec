@@ -1,6 +1,7 @@
 -- | @pipes@ utilities for incrementally running @attoparsec@-based parsers
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE RankNTypes         #-}
 
 module Pipes.Attoparsec (
@@ -55,7 +56,8 @@ parse parser = do
 --
 -- This producer returns @'Right' r@ when end-of-input is reached sucessfully,
 -- otherwise it returns a 'ParsingError' and the leftovers including
--- the malformed input that couldn't be parsed.
+-- the malformed input that couldn't be parsed. You can use 'Pipes.Lift.errorP'
+-- to promote the 'Either' return value to an 'ErrorT' monad transformer.
 parsed
   :: (Monad m, ParserInput a)
   => Attoparsec.Parser a b  -- ^ Attoparsec parser
@@ -150,6 +152,9 @@ data ParsingError = ParsingError
 
 instance Exception ParsingError
 instance Error     ParsingError
+
+-- | This instance allows using 'Pipes.Lift.errorP' with 'parsed' and 'parsedL'.
+instance Error (ParsingError, Producer a m r)
 
 --------------------------------------------------------------------------------
 -- Internal stuff
