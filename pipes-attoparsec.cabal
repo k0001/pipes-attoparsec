@@ -16,7 +16,7 @@ extra-source-files: README.md PEOPLE changelog
 description:
   Utilities to run Attoparsec parsers on Pipes input streams.
   .
-  See the @NEWS@ file in the source distribution to learn about any
+  See the @changelog@ file in the source distribution to learn about any
   important changes between version.
 
 source-repository head
