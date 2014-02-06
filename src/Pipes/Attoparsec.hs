@@ -1,4 +1,7 @@
--- | @pipes@ utilities for incrementally running @attoparsec@-based parsers
+-- | @pipes@ utilities for incrementally running @attoparsec@-based parsers.
+--
+-- This module assumes familiarity with @pipes-parse@, you can learn about it in
+-- "Pipes.Parse.Tutorial".
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances  #-}
@@ -8,11 +11,15 @@ module Pipes.Attoparsec (
     -- * Parsing
       parse
     , parsed
-    , isEndOfParserInput
 
-    -- ** Including input lenght.
+    -- ** Including input lenght
+    --
+    -- $lengths
     , parseL
     , parsedL
+
+    -- * Utils
+    , isEndOfParserInput
 
     -- * Types
     , ParserInput
@@ -40,6 +47,8 @@ import qualified Pipes.Prelude                    as P
 
 -- | Convert an @attoparsec@ 'Attoparsec.Parser' to a @pipes-parse@
 -- 'Pipes.Parser'.
+--
+-- This 'Pipes.Parser' is compatible with the tools from "Pipes.Parse".
 parse
   :: (Monad m, ParserInput a)
   => Attoparsec.Parser a b                    -- ^ Attoparsec parser
@@ -52,12 +61,13 @@ parse parser = do
 {-# INLINABLE parse #-}
 
 
--- | Convert a stream of 'ParserInput' to a producer of parsed values.
+-- | Convert a producer of 'ParserInput' to a producer of parsed values.
 --
--- This producer returns @'Right' r@ when end-of-input is reached sucessfully,
+-- This producer returns 'Right' when end-of-input is reached sucessfully,
 -- otherwise it returns a 'ParsingError' and the leftovers including
 -- the malformed input that couldn't be parsed. You can use 'Pipes.Lift.errorP'
--- to promote the 'Either' return value to an 'ErrorT' monad transformer.
+-- to promote the 'Either' return value to an 'Control.Monad.Trans.Error.ErrorT'
+-- monad transformer.
 parsed
   :: (Monad m, ParserInput a)
   => Attoparsec.Parser a b  -- ^ Attoparsec parser
@@ -66,13 +76,18 @@ parsed
 parsed parser p = for (parsedL parser p) (\(_, a) -> yield a)
 {-# INLINABLE parsed #-}
 
+--------------------------------------------------------------------------------
+-- $lengths
+-- Like the functions above, but these also provide information about
+-- the length of input consumed in order to fully parse each value.
+--------------------------------------------------------------------------------
 
 -- | Like 'parse', but also returns the length of input consumed to parse the
 -- value.
 parseL
     :: (Monad m, ParserInput a)
-    => Attoparsec.Parser a b    -- ^ Attoparsec parser
-    -> Pipes.Parser a m (Either ParsingError (Int, b))
+    => Attoparsec.Parser a b                           -- ^ Attoparsec parser
+    -> Pipes.Parser a m (Either ParsingError (Int, b)) -- ^ Pipes parser
 parseL parser = S.StateT $ \p0 -> do
     x <- next (p0 >-> P.filter (/= mempty))
     case x of
@@ -153,7 +168,7 @@ data ParsingError = ParsingError
 instance Exception ParsingError
 instance Error     ParsingError
 
--- | This instance allows using 'Pipes.Lift.errorP' with 'parsed' and 'parsedL'.
+-- | This instance allows using 'Pipes.Lift.errorP' with 'parsed' and 'parsedL'
 instance Error (ParsingError, Producer a m r)
 
 --------------------------------------------------------------------------------
