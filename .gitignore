@@ -10,3 +10,6 @@ dist
 *.o
 TAGS
 vendor
+.cabal-sandbox/
+.shelly/
+cabal.sandbox.config
