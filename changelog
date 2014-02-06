@@ -1,6 +1,6 @@
-# Version HEAD
+# Version 0.4.0
 
-* API revamped in order tu support pipes-parse-3.0.*.
+* API revamped in order to support pipes-parse-3.0.*.
 
 
 # Version 0.3.1
