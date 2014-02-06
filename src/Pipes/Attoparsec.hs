@@ -19,7 +19,6 @@ module Pipes.Attoparsec (
     ) where
 
 import           Control.Exception                (Exception)
-import           Control.Monad                    (liftM)
 import           Control.Monad.Trans.Error        (Error)
 import qualified Control.Monad.Trans.State.Strict as S
 import qualified Data.Attoparsec.ByteString
@@ -29,7 +28,6 @@ import qualified Data.Attoparsec.Types            as Attoparsec
 import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString
 import           Data.Data                        (Data, Typeable)
-import           Data.Maybe                       (isJust)
 import           Data.Monoid                      (Monoid (mempty))
 import           Data.Text                        (Text)
 import qualified Data.Text
@@ -55,9 +53,9 @@ parse parser = do
 
 -- | Convert a stream of 'ParserInput' to a producer of parsed values.
 --
--- This producer returns 'Nothing' when end-of-input is reached successfully,
--- otherwise it returns a 'ParsingError' and the leftovers. The leftovers
--- include any input that it was in the process of being parsed.
+-- This producer returns @'Right' r@ when end-of-input is reached sucessfully,
+-- otherwise it returns a 'ParsingError' and the leftovers including
+-- the malformed input that couldn't be parsed.
 parsed
   :: (Monad m, ParserInput a)
   => Attoparsec.Parser a b  -- ^ Attoparsec parser
@@ -99,7 +97,7 @@ parsedL
     -> Producer (Int, b) m (Either (ParsingError, Producer a m r) r)
 parsedL parser = go where
     go p0 = do
-      mr <- lift $ S.evalStateT isEndOfParserInput' p0
+      mr <- lift $ S.evalStateT atEndOfParserInput p0
       case mr of
          Just r  -> return (Right r)
          Nothing -> do
@@ -109,10 +107,16 @@ parsedL parser = go where
                Right a -> yield a >> go p1
 {-# INLINABLE parsedL #-}
 
+--------------------------------------------------------------------------------
+
 -- | Like 'Pipes.Parse.isEndOfInput', except that it also consumes and discards
 -- leading empty chunks.
 isEndOfParserInput :: (Monad m, ParserInput a) => Pipes.Parser a m Bool
-isEndOfParserInput = isJust `liftM` isEndOfParserInput'
+isEndOfParserInput = do
+    mr <- atEndOfParserInput
+    return (case mr of
+       Nothing -> False
+       Just _  -> True)
 {-# INLINABLE isEndOfParserInput #-}
 
 --------------------------------------------------------------------------------
@@ -125,12 +129,16 @@ class (Eq a, Monoid a) => ParserInput a where
 -- | Strict 'ByteString'.
 instance ParserInput ByteString where
     _parse  = Data.Attoparsec.ByteString.parse
+    {-# INLINE _parse #-}
     _length = Data.ByteString.length
+    {-# INLINE _length #-}
 
 -- | Strict 'Text'.
 instance ParserInput Text where
     _parse  = Data.Attoparsec.Text.parse
+    {-# INLINE _parse #-}
     _length = Data.Text.length
+    {-# INLINE _length #-}
 
 --------------------------------------------------------------------------------
 
@@ -146,11 +154,11 @@ instance Error     ParsingError
 --------------------------------------------------------------------------------
 -- Internal stuff
 
--- | Like 'isEndOfParserInput'', except it returns @'Just' r@ if the producer
--- has reached end of input, otherwise 'Nothing'.
-isEndOfParserInput'
+-- | Returns @'Just' r@ if the producer has reached end of input, otherwise
+-- 'Nothing'.
+atEndOfParserInput
   :: (Monad m, ParserInput a) => S.StateT (Producer a m r) m (Maybe r)
-isEndOfParserInput' = go =<< S.get where
+atEndOfParserInput = go =<< S.get where
     go p0 = do
       x <- lift (next p0)
       case x of
@@ -158,5 +166,5 @@ isEndOfParserInput' = go =<< S.get where
          Right (a,p1)
           | a == mempty -> go p1
           | otherwise   -> S.put (yield a >> p1) >> return Nothing
-{-# INLINABLE isEndOfParserInput' #-}
+{-# INLINABLE atEndOfParserInput #-}
 
