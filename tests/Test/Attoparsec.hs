@@ -57,8 +57,10 @@ foursTests =
   , (True  ,"2 chunk: One'''"           ,["aaaa",""]        ,['a']     ,[])
   , (True  ,"2 chunk: Two"              ,["aaaa","bbbb"]    ,['a','b'] ,[])
   , (False ,"2 chunk: Wrong"            ,["abcd","efgh"]    ,[]        ,["abcd","efgh"])
+  , (False ,"2 chunk: Wrong'"           ,["a","axbb"]       ,[]        ,["a","axbb"])
   , (False ,"2 chunk: One then wrong"   ,["aaaab","bxz"]    ,['a']     ,["b","bxz"])
   , (True  ,"3 chunk: One"              ,["a","a","aa"]     ,['a']     ,[])
+  , (False ,"3 chunk: Wrong"            ,["a","a","axbb"]   ,[]        ,["a","a","axbb"])
   ]
 
 testCaseFoursTest :: (Bool, [Char], [Text], [Char], [Text]) -> TestTree
