@@ -12,7 +12,7 @@ module Pipes.Attoparsec (
       parse
     , parsed
 
-    -- ** Including input lenght
+    -- ** Including input length
     --
     -- $lengths
     , parseL
