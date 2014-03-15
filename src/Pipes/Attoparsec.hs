@@ -114,14 +114,14 @@ parsedL
     -> Producer (Int, b) m (Either (ParsingError, Producer a m r) r)
 parsedL parser = go where
     go p0 = do
-      (mr, p1) <- lift $ S.runStateT atEndOfParserInput p0
-      case mr of
-         Just r  -> return (Right r)
-         Nothing -> do
-            (x, p2) <- lift $ S.runStateT (parseL parser) p1
-            case x of
-               Left  e -> return (Left (e, p2))
-               Right a -> yield a >> go p2
+      x <- lift (nextSkipEmpty p0)
+      case x of
+         Left r        -> return (Right r)
+         Right (a, p1) -> do
+            (eb, p2) <- lift $ S.runStateT (parseL parser) (yield a >> p1)
+            case eb of
+               Left e  -> return (Left (e, p2))
+               Right b -> yield b >> go p2
 {-# INLINABLE parsedL #-}
 
 --------------------------------------------------------------------------------
@@ -130,10 +130,11 @@ parsedL parser = go where
 -- leading empty chunks.
 isEndOfParserInput :: (Monad m, ParserInput a) => Pipes.Parser a m Bool
 isEndOfParserInput = do
-    mr <- atEndOfParserInput
-    return (case mr of
-       Nothing -> False
-       Just _  -> True)
+    p0 <- S.get
+    x <- lift (nextSkipEmpty p0)
+    case x of
+       Left r        -> S.put (return r)      >> return True
+       Right (a, p1) -> S.put (yield a >> p1) >> return False
 {-# INLINABLE isEndOfParserInput #-}
 
 --------------------------------------------------------------------------------
@@ -174,17 +175,18 @@ instance Error (ParsingError, Producer a m r)
 --------------------------------------------------------------------------------
 -- Internal stuff
 
--- | Returns @'Just' r@ if the producer has reached end of input, otherwise
--- 'Nothing'.
-atEndOfParserInput
-  :: (Monad m, ParserInput a) => S.StateT (Producer a m r) m (Maybe r)
-atEndOfParserInput = go =<< S.get where
+-- | Like 'Pipes.next', except it skips leading 'mempty' chunks.
+nextSkipEmpty
+  :: (Monad m, Eq a, Monoid a)
+  => Producer a m r
+  -> m (Either r (a, Producer a m r))
+nextSkipEmpty = go where
     go p0 = do
-      x <- lift (next p0)
+      x <- next p0
       case x of
-         Left r -> S.put (return r) >> return (Just r)
+         Left  _        -> return x
          Right (a,p1)
           | a == mempty -> go p1
-          | otherwise   -> S.put (yield a >> p1) >> return Nothing
-{-# INLINABLE atEndOfParserInput #-}
+          | otherwise   -> return x
+{-# INLINABLE nextSkipEmpty #-}
 
