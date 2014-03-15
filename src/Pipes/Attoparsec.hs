@@ -114,14 +114,14 @@ parsedL
     -> Producer (Int, b) m (Either (ParsingError, Producer a m r) r)
 parsedL parser = go where
     go p0 = do
-      mr <- lift $ S.evalStateT atEndOfParserInput p0
+      (mr, p1) <- lift $ S.runStateT atEndOfParserInput p0
       case mr of
          Just r  -> return (Right r)
          Nothing -> do
-            (x, p1) <- lift $ S.runStateT (parseL parser) p0
+            (x, p2) <- lift $ S.runStateT (parseL parser) p1
             case x of
-               Left  e -> return (Left (e, p1))
-               Right a -> yield a >> go p1
+               Left  e -> return (Left (e, p2))
+               Right a -> yield a >> go p2
 {-# INLINABLE parsedL #-}
 
 --------------------------------------------------------------------------------
