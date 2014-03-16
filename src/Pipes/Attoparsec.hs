@@ -128,12 +128,11 @@ parsedL parser = go where
 -- | Like 'Pipes.Parse.isEndOfInput', except that it also consumes and discards
 -- leading empty chunks.
 isEndOfParserInput :: (Monad m, ParserInput a) => Pipes.Parser a m Bool
-isEndOfParserInput = do
-    p0 <- S.get
-    x <- lift (nextSkipEmpty p0)
+isEndOfParserInput = S.StateT $ \p0 -> do
+    x <- nextSkipEmpty p0
     case x of
-       Left r        -> S.put (return r)      >> return True
-       Right (a, p1) -> S.put (yield a >> p1) >> return False
+       Left r        -> return (True,  return r)
+       Right (a, p1) -> return (False, yield a >> p1)
 {-# INLINABLE isEndOfParserInput #-}
 
 --------------------------------------------------------------------------------
