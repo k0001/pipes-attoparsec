@@ -3,6 +3,7 @@
 -- This module assumes familiarity with @pipes-parse@, you can learn about it in
 -- "Pipes.Parse.Tutorial".
 
+{-# LANGUAGE BangPatterns       #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE RankNTypes         #-}
@@ -48,15 +49,28 @@ import qualified Pipes.Parse                      as Pipes (Parser)
 -- 'Pipes.Parser'.
 --
 -- This 'Pipes.Parser' is compatible with the tools from "Pipes.Parse".
+--
+-- It returns 'Nothing' if the underlying 'Producer' is exhausted, otherwise
+-- it attempts to run the given attoparsec 'Attoparsec.Parser' on the underlying
+-- 'Producer', possibly failing with 'ParsingError'.
 parse
   :: (Monad m, ParserInput a)
-  => Attoparsec.Parser a b                    -- ^ Attoparsec parser
-  -> Pipes.Parser a m (Either ParsingError b) -- ^ Pipes parser
-parse parser = do
-    x <- parseL parser
-    return (case x of
-       Left   e     -> Left e
-       Right (_, a) -> Right a)
+  => Attoparsec.Parser a b                            -- ^ Attoparsec parser
+  -> Pipes.Parser a m (Maybe (Either ParsingError b)) -- ^ Pipes parser
+parse parser = S.StateT $ \p0 -> do
+    x <- nextSkipEmpty p0
+    case x of
+      Left r       -> return (Nothing, return r)
+      Right (a,p1) -> step (yield a >>) (_parse parser a) p1
+  where
+    step diffP res p0 = case res of
+      Fail _ c m -> return (Just (Left (ParsingError c m)), diffP p0)
+      Done a b   -> return (Just (Right b), yield a >> p0)
+      Partial k  -> do
+        x <- nextSkipEmpty p0
+        case x of
+          Left e -> step diffP (k mempty) (return e)
+          Right (a,p1) -> step (diffP . (yield a >>)) (k a) p1
 {-# INLINABLE parse #-}
 
 
@@ -72,7 +86,21 @@ parsed
   => Attoparsec.Parser a b  -- ^ Attoparsec parser
   -> Producer a m r         -- ^ Raw input
   -> Producer b m (Either (ParsingError, Producer a m r) r)
-parsed parser p = for (parsedL parser p) (\(_, a) -> yield a)
+parsed parser = go
+  where
+    go p0 = do
+      x <- lift (nextSkipEmpty p0)
+      case x of
+        Left r       -> return (Right r)
+        Right (a,p1) -> step (yield a >>) (_parse parser a) p1
+    step diffP res p0 = case res of
+      Fail _ c m -> return (Left (ParsingError c m, diffP p0))
+      Done a b   -> yield b >> go (yield a >> p0)
+      Partial k  -> do
+        x <- lift (nextSkipEmpty p0)
+        case x of
+          Left e -> step diffP (k mempty) (return e)
+          Right (a,p1) -> step (diffP . (yield a >>)) (k a) p1
 {-# INLINABLE parsed #-}
 
 --------------------------------------------------------------------------------
@@ -86,21 +114,21 @@ parsed parser p = for (parsedL parser p) (\(_, a) -> yield a)
 parseL
     :: (Monad m, ParserInput a)
     => Attoparsec.Parser a b                           -- ^ Attoparsec parser
-    -> Pipes.Parser a m (Either ParsingError (Int, b)) -- ^ Pipes parser
+    -> Pipes.Parser a m (Maybe (Either ParsingError (Int, b))) -- ^ Pipes parser
 parseL parser = S.StateT $ \p0 -> do
     x <- nextSkipEmpty p0
     case x of
-      Left   e      -> go id (_parse parser mempty) (return e) 0
-      Right (t, p1) -> go (yield t >>) (_parse parser t) p1 $! _length t
+      Left r       -> return (Nothing, return r)
+      Right (a,p1) -> step (yield a >>) (_parse parser a) p1 (_length a)
   where
-    go diffP iResult p0 len = case iResult of
-      Fail _ c m -> return (Left  (ParsingError c m)  , diffP p0)
-      Done t r   -> return (Right (len - _length t, r), yield t >> p0)
+    step diffP res p0 !len = case res of
+      Fail _ c m -> return (Just (Left (ParsingError c m)), diffP p0)
+      Done a b   -> return (Just (Right (len - _length a, b)), yield a >> p0)
       Partial k  -> do
         x <- nextSkipEmpty p0
         case x of
-          Left   e      -> go diffP (k mempty) (return e) len
-          Right (t, p1) -> go (diffP . (yield t >>)) (k t) p1 $! len + _length t
+          Left e -> step diffP (k mempty) (return e) len
+          Right (a,p1) -> step (diffP . (yield a >>)) (k a) p1 (len + _length a)
 {-# INLINABLE parseL #-}
 
 
@@ -111,16 +139,21 @@ parsedL
     => Attoparsec.Parser a b    -- ^ Attoparsec parser
     -> Producer a m r           -- ^ Raw input
     -> Producer (Int, b) m (Either (ParsingError, Producer a m r) r)
-parsedL parser = go where
+parsedL parser = go
+  where
     go p0 = do
       x <- lift (nextSkipEmpty p0)
       case x of
-         Left r        -> return (Right r)
-         Right (a, p1) -> do
-            (eb, p2) <- lift $ S.runStateT (parseL parser) (yield a >> p1)
-            case eb of
-               Left e  -> return (Left (e, p2))
-               Right b -> yield b >> go p2
+        Left r       -> return (Right r)
+        Right (a,p1) -> step (yield a >>) (_parse parser a) p1 (_length a)
+    step diffP res p0 !len = case res of
+      Fail _ c m -> return (Left (ParsingError c m, diffP p0))
+      Done a b   -> yield (len - _length a, b) >> go (yield a >> p0)
+      Partial k  -> do
+        x <- lift (nextSkipEmpty p0)
+        case x of
+          Left e -> step diffP (k mempty) (return e) len
+          Right (a,p1) -> step (diffP . (yield a >>)) (k a) p1 (len + _length a)
 {-# INLINABLE parsedL #-}
 
 --------------------------------------------------------------------------------
