@@ -12,11 +12,11 @@ category:           Pipes, Parser
 build-type:         Simple
 cabal-version:      >=1.8
 synopsis:           Attoparsec and Pipes integration.
-extra-source-files: README.md PEOPLE changelog
+extra-source-files: README.md PEOPLE changelog.md
 description:
   Utilities to run Attoparsec parsers on Pipes input streams.
   .
-  See the @changelog@ file in the source distribution to learn about any
+  See the @changelog.md@ file in the source distribution to learn about any
   important changes between version.
 
 source-repository head

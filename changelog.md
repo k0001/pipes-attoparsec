@@ -1,3 +1,13 @@
+# Version 0.5
+
+* Correctly propagate state in `parsedL`.
+
+* `parse` and `parseL` return `Nothing` if used on an exhausted
+  `Producer`.
+
+* Performance improvements.
+
+
 # Version 0.4.0.1
 
 * Relax lower and upper dependencies on `text`.
