@@ -1,4 +1,4 @@
-# Version 0.5
+# Version 0.5.0
 
 * Correctly propagate state in `parsedL`.
 
