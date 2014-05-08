@@ -12,12 +12,14 @@ module Pipes.Attoparsec (
     -- * Parsing
       parse
     , parsed
+    , parsedState
 
     -- ** Including input length
     --
     -- $lengths
     , parseL
     , parsedL
+    , parsedStateL
 
     -- * Utils
     , isEndOfParserInput
@@ -103,6 +105,34 @@ parsed parser = go
           Right (a,p1) -> step (diffP . (yield a >>)) (k a) p1
 {-# INLINABLE parsed #-}
 
+-- | Like 'parsed', but using 'S.StateT' wrapped 'Attoparsec.Parser' to allow
+-- for stateful stream parsing.
+--
+-- The state returned by each succesful parse is used a starting state for the
+-- next parse. On failure the beginning state for the failed parse is returned.
+parsedState
+  :: (Monad m, ParserInput a)
+  => S.StateT s (Attoparsec.Parser a) b  -- ^ Attoparsec parser
+  -> s                                   -- ^ Initial state
+  -> Producer a m r                      -- ^ Raw input
+  -> Producer b m (Either ((ParsingError, s), Producer a m r) r)
+parsedState parser = go
+  where
+    go s p0 = do
+      x <- lift (nextSkipEmpty p0)
+      case x of
+        Left r       -> return (Right r)
+        Right (a,p1) -> step (yield a >>) (_parse (S.runStateT parser s) a) p1 s
+    step diffP res p0 s = case res of
+      Fail _ c m -> return (Left ((ParsingError c m, s), diffP p0))
+      Done a (b, newS) -> yield b >> go newS (yield a >> p0)
+      Partial k  -> do
+        x <- lift (nextSkipEmpty p0)
+        case x of
+          Left e -> step diffP (k mempty) (return e) s
+          Right (a,p1) -> step (diffP . (yield a >>)) (k a) p1 s
+{-# INLINABLE parsedState #-}
+
 --------------------------------------------------------------------------------
 -- $lengths
 -- Like the functions above, but these also provide information about
@@ -155,6 +185,31 @@ parsedL parser = go
           Left e -> step diffP (k mempty) (return e) len
           Right (a,p1) -> step (diffP . (yield a >>)) (k a) p1 (len + _length a)
 {-# INLINABLE parsedL #-}
+
+-- | Like 'parsedState', except this tags each parsed value with the length of
+-- input consumed to parse the value.
+parsedStateL
+    :: (Monad m, ParserInput a)
+    => S.StateT s (Attoparsec.Parser a) b    -- ^ Attoparsec parser
+    -> s                                     -- ^ Initial state
+    -> Producer a m r                        -- ^ Raw input
+    -> Producer (Int, b) m (Either (ParsingError, Producer a m r) r)
+parsedStateL parser = go
+  where
+    go s p0 = do
+      x <- lift (nextSkipEmpty p0)
+      case x of
+        Left r       -> return (Right r)
+        Right (a,p1) -> step (yield a >>) (_parse (S.runStateT parser s) a) p1 (_length a) s
+    step diffP res p0 !len s = case res of
+      Fail _ c m -> return (Left (ParsingError c m, diffP p0))
+      Done a (b, newS) -> yield (len - _length a, b) >> go newS (yield a >> p0)
+      Partial k  -> do
+        x <- lift (nextSkipEmpty p0)
+        case x of
+          Left e -> step diffP (k mempty) (return e) len s
+          Right (a,p1) -> step (diffP . (yield a >>)) (k a) p1 (len + _length a) s
+{-# INLINABLE parsedStateL #-}
 
 --------------------------------------------------------------------------------
 
