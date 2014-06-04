@@ -1,3 +1,8 @@
+# Version 0.5.1
+
+* Bump upper bound dependency on `attoparsec`.
+
+
 # Version 0.5.0
 
 * Correctly propagate state in `parsedL`.
