@@ -1,3 +1,8 @@
+# Version 0.5.1.1
+
+* Bump upper bound dependency on `text`.
+
+
 # Version 0.5.1
 
 * Bump upper bound dependency on `attoparsec`.
