@@ -1,3 +1,8 @@
+# Version 0.5.1.3
+
+* Bump upper bound dependency on `transformers`.
+
+
 # Version 0.5.1.2
 
 * Bump upper bound dependency on `attoparsec`.
