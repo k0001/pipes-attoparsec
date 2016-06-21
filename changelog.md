@@ -1,3 +1,8 @@
+# Version 0.5.1.4
+
+* Bump upper bound dependency on `pipes`.
+
+
 # Version 0.5.1.3
 
 * Bump upper bound dependency on `transformers`.
