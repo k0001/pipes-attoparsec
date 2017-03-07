@@ -12,6 +12,8 @@ module Pipes.Attoparsec (
     -- * Parsing
       parse
     , parsed
+    , parseStream
+    , parseStateStream
 
     -- ** Including input length
     --
@@ -102,6 +104,70 @@ parsed parser = go
           Left e -> step diffP (k mempty) (return e)
           Right (a,p1) -> step (diffP . (yield a >>)) (k a) p1
 {-# INLINABLE parsed #-}
+
+-- | Creates a 'Pipe' that parses a stream of @a@ into a stream of @b@.
+--
+-- If a parsing error occurs the parse error handler is called. It's arguments
+-- are @attoparsec@'s results on failure, that is:
+--
+--      1. the failing input
+--
+--      2. the list of attoparsec context in which the error occured
+--
+--      3. the actual parse error
+--
+-- The result of the error handler is a 'Pipe' @a b m a@, in other words, the
+-- handler is allowed to 'await' and 'yield' any number of times,
+-- eventually returning an @a@ which will be used as inital input for
+-- restarting the stream parsing.
+--
+-- Consider the following example error handlers:
+--
+-- > parseStream someParser (\input _ _ -> return mempty)
+--
+-- This silently discards parse failures and restarts the stream parsing.
+--
+-- /Note:/ This is very barebones, in reality the handler should probably
+-- examine the @input@ and determine a good point to resume parsing from.
+--
+-- > parseStream someParser (\_ _ msg -> throwIO (userError msg))
+--
+-- This just aborts parsing by throwing an exception.
+parseStream
+  :: (Monad m, ParserInput a)
+  => Attoparsec.Parser a b                      -- ^ Attoparsec parser
+  -> (a -> [String] -> String -> Pipe a b m a)  -- ^ Parse error handler
+  -> Pipe a b m r
+parseStream parser onError = await >>= parse'
+  where
+    parse' = loop . _parse parser
+
+    loop (Fail t context msg) = onError t context msg >>= parse'
+    loop (Done rest result) = yield result >> parse' rest
+    loop (Partial resume) = await >>= loop . resume
+{-# INLINABLE parseStream #-}
+
+-- | Creates a 'Pipe' that parses a stream of @a@ into a stream of @b@ using a
+-- stateful @attoparsec@ paser.
+--
+-- Similar to 'parseStream', but takes an 'Data.Attoparsec.Types.Parser'
+-- wrapped in 'StateT'. The parse error handler takes as extra input argument
+-- the \"previous\" state and should return the \"new\" state to resume with,
+-- in addition to the @a@ value.
+parseStateStream
+  :: (Monad m, ParserInput a)
+  => S.StateT s (Attoparsec.Parser a) b                     -- ^ Stateful Attoparsec parser
+  -> (s -> a -> [String] -> String -> Pipe a b m (s, a))    -- ^ Parser error handler
+  -> s                                                      -- ^ Initial state
+  -> Pipe a b m r
+parseStateStream parser onError initState = await >>= parse' initState
+  where
+    parse' s = loop s . _parse (S.runStateT parser s)
+
+    loop s (Fail t context msg) = onError s t context msg >>= uncurry parse'
+    loop _ (Done rest (result, s)) = yield result >> parse' s rest
+    loop s (Partial resume) = await >>= loop s . resume
+{-# INLINABLE parseStateStream #-}
 
 --------------------------------------------------------------------------------
 -- $lengths
