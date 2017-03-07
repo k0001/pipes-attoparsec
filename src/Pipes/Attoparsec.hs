@@ -42,6 +42,7 @@ import           Data.Text                        (Text)
 import qualified Data.Text
 import           Pipes
 import qualified Pipes.Parse                      as Pipes (Parser)
+import qualified Pipes.Prelude                    as P
 
 --------------------------------------------------------------------------------
 
@@ -116,7 +117,7 @@ parseL
     => Attoparsec.Parser a b                           -- ^ Attoparsec parser
     -> Pipes.Parser a m (Maybe (Either ParsingError (Int, b))) -- ^ Pipes parser
 parseL parser = S.StateT $ \p0 -> do
-    x <- nextSkipEmpty p0
+    x <- next p0
     case x of
       Left r       -> return (Nothing, return r)
       Right (a,p1) -> step (yield a >>) (_parse parser a) p1 (_length a)
@@ -125,7 +126,7 @@ parseL parser = S.StateT $ \p0 -> do
       Fail _ c m -> return (Just (Left (ParsingError c m)), diffP p0)
       Done a b   -> return (Just (Right (len - _length a, b)), yield a >> p0)
       Partial k  -> do
-        x <- nextSkipEmpty p0
+        x <- next p0
         case x of
           Left e -> step diffP (k mempty) (return e) len
           Right (a,p1) -> step (diffP . (yield a >>)) (k a) p1 (len + _length a)
