@@ -1,3 +1,8 @@
+# Version 0.5.1.5
+
+* Remove upper bound limits on dependencies other than `base`.
+
+
 # Version 0.5.1.4
 
 * Bump upper bound dependency on `pipes`.
