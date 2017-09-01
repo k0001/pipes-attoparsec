@@ -76,7 +76,7 @@ parse parser = S.StateT $ \p0 -> do
 
 -- | Convert a producer of 'ParserInput' to a producer of parsed values.
 --
--- This producer returns 'Right' when end-of-input is reached sucessfully,
+-- This producer returns 'Right' when end-of-input is reached successfully,
 -- otherwise it returns a 'ParsingError' and the leftovers including
 -- the malformed input that couldn't be parsed. You can use 'Pipes.Lift.errorP'
 -- to promote the 'Either' return value to an 'Control.Monad.Trans.Error.ErrorT'
