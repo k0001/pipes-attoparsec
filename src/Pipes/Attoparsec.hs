@@ -28,7 +28,6 @@ module Pipes.Attoparsec (
     ) where
 
 import           Control.Exception                (Exception)
-import           Control.Monad.Trans.Error        (Error)
 import qualified Control.Monad.Trans.State.Strict as S
 import qualified Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.Text
@@ -37,7 +36,6 @@ import qualified Data.Attoparsec.Types            as Attoparsec
 import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString
 import           Data.Data                        (Data, Typeable)
-import           Data.Monoid                      (Monoid (mempty))
 import           Data.Text                        (Text)
 import qualified Data.Text
 import           Pipes
@@ -198,10 +196,6 @@ data ParsingError = ParsingError
     } deriving (Show, Read, Eq, Data, Typeable)
 
 instance Exception ParsingError
-instance Error     ParsingError
-
--- | This instance allows using 'Pipes.Lift.errorP' with 'parsed' and 'parsedL'
-instance Error (ParsingError, Producer a m r)
 
 --------------------------------------------------------------------------------
 -- Internal stuff
