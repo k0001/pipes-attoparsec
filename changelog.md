@@ -1,3 +1,8 @@
+# Version 0.6.0
+
+* Remove support for `Control.Monad.Trans.Error`. 
+
+
 # Version 0.5.1.5
 
 * Remove upper bound limits on dependencies other than `base`.
