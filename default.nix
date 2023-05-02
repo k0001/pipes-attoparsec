@@ -1,10 +1,10 @@
-{ mkDerivation, attoparsec, base, bytestring, HUnit, mmorph, pipes
-, pipes-parse, stdenv, tasty, tasty-hunit, text, transformers
+{ mkDerivation, attoparsec, base, bytestring, HUnit, lib, mmorph
+, pipes, pipes-parse, tasty, tasty-hunit, text, transformers
 }:
 mkDerivation {
   pname = "pipes-attoparsec";
-  version = "0.5.1.5";
-  src = ./.;
+  version = "0.6.0";
+  src = lib.sources.cleanSource ./.;
   libraryHaskellDepends = [
     attoparsec base bytestring pipes pipes-parse text transformers
   ];
@@ -14,5 +14,5 @@ mkDerivation {
   ];
   homepage = "https://github.com/k0001/pipes-attoparsec";
   description = "Attoparsec and Pipes integration";
-  license = stdenv.lib.licenses.bsd3;
+  license = lib.licenses.bsd3;
 }

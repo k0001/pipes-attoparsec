@@ -1,9 +1,11 @@
+result
 *.swp
 *.swn
 *.swo
 *~
 cabal-dev
 dist
+dist-newstyle
 *.prof
 *.eventlog
 *.hi
